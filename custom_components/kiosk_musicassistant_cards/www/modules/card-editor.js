@@ -155,6 +155,10 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         ] },
         { name: 'fill', selector: { boolean: {} } },
         { name: 'discover', selector: { boolean: {} } },
+        { name: 'discover_source', selector: { select: { mode: 'dropdown', options: [
+          { value: 'mixed', label: ed.srcMix }, { value: 'spotify', label: ed.srcSpotify },
+          { value: 'music_assistant', label: ed.srcMa },
+        ] } } },
         { name: 'arrows', selector: { boolean: {} } },
         { name: 'kiosk_theme', selector: { boolean: {} } },
         { name: 'language', selector: { select: { mode: 'dropdown', options: [
@@ -168,6 +172,7 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         fill_margin: c.fill_margin == null ? 8 : c.fill_margin,
         fill: c.fill === true,
         discover: c.discover !== false,
+        discover_source: c.discover_source || 'mixed',
         arrows: c.arrows !== false,
         kiosk_theme: c.kiosk_theme !== false,
         language: c.language || '',
@@ -179,6 +184,8 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         } else this._cfg.fill_margin = v.fill_margin;
         if (v.fill) this._cfg.fill = true; else delete this._cfg.fill;
         if (v.discover === false) this._cfg.discover = false; else delete this._cfg.discover;
+        if (v.discover_source && v.discover_source !== 'mixed') this._cfg.discover_source = v.discover_source;
+        else delete this._cfg.discover_source;
         this._cfg.arrows = !!v.arrows;
         if (v.kiosk_theme === false) this._cfg.kiosk_theme = false; else delete this._cfg.kiosk_theme;
         if (v.language) this._cfg.language = v.language; else delete this._cfg.language;
@@ -321,15 +328,20 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
       { name: 'connect_entity', selector: { entity: {
         filter: { domain: 'media_player', integration: 'spotify' },
       } } },
+      { name: 'spotify_entity', selector: { entity: {
+        filter: { domain: 'media_player', integration: 'spotifyplus' },
+      } } },
     ];
     sources.forEach((source, index) => {
       const form = this._form(sSchema, {
         name: source.name || '', icon: this._mdi(source.icon), username: source.username || '',
         connect_entity: source.connect_entity || '',
+        spotify_entity: source.spotify_entity || '',
       }, (value) => {
         const entry = { name: value.name, username: (value.username || '').trim() };
         if (value.icon) entry.icon = value.icon;
         if (value.connect_entity) entry.connect_entity = value.connect_entity;
+        if (value.spotify_entity) entry.spotify_entity = value.spotify_entity;
         this._cfg.music_sources = (this._cfg.music_sources || []).slice();
         this._cfg.music_sources[index] = entry;
         this._melden();

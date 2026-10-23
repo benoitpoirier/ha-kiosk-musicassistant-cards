@@ -463,7 +463,12 @@ export class MusicAssistantTouchCard extends HTMLElement {
   // ---------- discover ----------
   // Music Assistant's own recommendation rows, fetched on behalf of the
   // selected music source so every person gets their own feed.
-  _ontdekSleutel() { return `${this._cfg.config_entry_id}|${this._user() || ''}`; }
+  _ontdekBron() {
+    const bron = this._cfg.discover_source;
+    return ['spotify', 'music_assistant', 'mixed'].includes(bron) ? bron : 'mixed';
+  }
+
+  _ontdekSleutel() { return `${this._cfg.config_entry_id}|${this._user() || ''}|${this._ontdekBron()}`; }
 
   _ontdekHaal(force) {
     if (!this._hass || !this._cfg || !this._discover) return Promise.resolve();
@@ -480,8 +485,12 @@ export class MusicAssistantTouchCard extends HTMLElement {
       config_entry_id: this._cfg.config_entry_id,
       row_limit: 20,
       include_hidden: this._cfg.discover_hidden_rows !== false,
+      source: this._ontdekBron(),
     };
     if (this._user()) data.username = this._user();
+    const bron = this._sourceCfg();
+    const spotify = (bron && bron.spotify_entity) || this._cfg.spotify_entity;
+    if (spotify && data.source !== 'music_assistant') data.spotify_entity = spotify;
     const p = this._ws({
       type: 'call_service', domain: DOMAIN, service: 'get_recommendations',
       service_data: data, return_response: true,
@@ -506,6 +515,8 @@ export class MusicAssistantTouchCard extends HTMLElement {
 
   _rijNaam(row) {
     const t = this._taal();
+    if (row.translation_key === 'for_you') return t.voorJou;
+    if (row.translation_key === 'because_you_listen' && row.seed) return t.omdat.replace('{x}', row.seed);
     const naam = String(row.name || '');
     const sleutel = String(row.translation_key || '').replace(/_/g, ' ').toLowerCase();
     return t.rijNamen[naam.toLowerCase()] || t.rijNamen[sleutel] || naam;
@@ -1370,7 +1381,11 @@ export class MusicAssistantTouchCard extends HTMLElement {
       const it = row && row.items[i];
       if (!it) return;
       const soort = it.media_type || SOORT_VAN(it.uri);
-      if (a === 'okspeel' || soort === 'track' || soort === 'radio') this._speel(it.uri, false, t);
+      if (soort === 'track') {
+        // Queue the rest of the row too, so 'next' keeps discovering.
+        const tracks = row.items.filter((x) => (x.media_type || SOORT_VAN(x.uri)) === 'track');
+        this._speelLijst(tracks.map((x) => x.uri), tracks.indexOf(it), t);
+      } else if (a === 'okspeel' || soort === 'radio') this._speel(it.uri, false, t);
       else this._open({ name: it.name, uri: it.uri }, t, 'ontdek');
     }
     else if (a === 'okrol') {
@@ -1588,9 +1603,10 @@ export class MusicAssistantTouchCard extends HTMLElement {
     let heldR = -1;
     let heldI = -1;
     // Feature something from a full row rather than the single item of
-    // "recently played", preferring an album or playlist with artwork.
+    // "recently played": the first Spotify pick, else an album or playlist.
     const kandidaat = (row) => row.items.findIndex((it) => VEILIG(it.image)
-      && ['album', 'playlist'].includes(it.media_type || SOORT_VAN(it.uri)));
+      && (row.source === 'spotify'
+        || ['album', 'playlist'].includes(it.media_type || SOORT_VAN(it.uri))));
     for (const minimum of [3, 1]) {
       for (let r = 0; r < c.rows.length && heldR < 0; r++) {
         if (c.rows[r].items.length < minimum) continue;

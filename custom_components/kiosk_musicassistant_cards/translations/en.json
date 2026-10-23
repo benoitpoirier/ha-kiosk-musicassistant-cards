@@ -59,6 +59,14 @@
         "include_hidden": {
           "name": "Include hidden rows",
           "description": "Also return the rows Music Assistant hides by default."
+        },
+        "source": {
+          "name": "Source",
+          "description": "music_assistant: Music Assistant rows. spotify: new tracks from Spotify's recommendation engine, seeded with your listening history. mixed: Spotify rows first, then Music Assistant rows."
+        },
+        "spotify_entity": {
+          "name": "SpotifyPlus player",
+          "description": "SpotifyPlus media player of the account whose Spotify listening history (top and recently played tracks) seeds the recommendations. Without it, the Music Assistant history is used."
         }
       }
     }

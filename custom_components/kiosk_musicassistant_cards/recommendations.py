@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 from typing import Any
 
 import voluptuous as vol
 from homeassistant.components.music_assistant.helpers import get_music_assistant_client
 from homeassistant.components.music_assistant.schemas import media_item_dict_from_mass_item
-from homeassistant.core import ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from music_assistant_models.media_items import media_from_dict
@@ -21,6 +22,19 @@ MAX_TOP_PICKS_LIMIT = 100
 RECENTLY_PLAYED_LIMIT = 12
 ROW_LIMIT = 20
 MAX_ROW_LIMIT = 50
+
+SOURCE_MUSIC_ASSISTANT = "music_assistant"
+SOURCE_SPOTIFY = "spotify"
+SOURCE_MIXED = "mixed"
+SOURCES = [SOURCE_MUSIC_ASSISTANT, SOURCE_SPOTIFY, SOURCE_MIXED]
+
+# Spotify discovery: a few tracks of the listening history are the seeds, and
+# Spotify's recommendation engine (reached through Music Assistant's Spotify
+# provider, whose global session still has that endpoint) does the rest.
+SEED_POOL = 20
+SEED_COUNT = 6
+SEED_ROWS = 3
+SIMILAR_LIMIT = 25
 
 GET_TOP_PICKS_SCHEMA = vol.Schema(
     {
@@ -39,6 +53,8 @@ GET_RECOMMENDATIONS_SCHEMA = vol.Schema(
             cv.positive_int, vol.Range(min=1, max=MAX_ROW_LIMIT)
         ),
         vol.Optional("include_hidden", default=False): cv.boolean,
+        vol.Optional("source", default=SOURCE_MUSIC_ASSISTANT): vol.In(SOURCES),
+        vol.Optional("spotify_entity"): cv.entity_id,
     }
 )
 
@@ -161,12 +177,10 @@ async def async_get_top_picks(call: ServiceCall) -> dict[str, list[dict[str, Any
     return {"items": items}
 
 
-async def async_get_recommendations(call: ServiceCall) -> dict[str, list[dict[str, Any]]]:
-    """Return Music Assistant's recommendation rows, each with its own items."""
-    mass = get_music_assistant_client(call.hass, call.data["config_entry_id"])
-    user = call.data.get("username")
-    row_limit = call.data["row_limit"]
-    include_hidden = call.data["include_hidden"]
+async def _async_ma_rows(
+    mass: Any, user: str | None, row_limit: int, include_hidden: bool
+) -> list[dict[str, Any]]:
+    """Music Assistant's own recommendation rows (recently played, random...)."""
     try:
         rows = await _async_fetch_rows(mass, user, include_hidden)
     except HomeAssistantError:
@@ -200,7 +214,191 @@ async def async_get_recommendations(call: ServiceCall) -> dict[str, list[dict[st
                 "translation_key": folder.get("translation_key"),
                 "subtitle": folder.get("subtitle"),
                 "icon": folder.get("icon"),
+                "source": SOURCE_MUSIC_ASSISTANT,
                 "items": items,
             }
         )
-    return {"rows": result}
+    return result
+
+
+def _seed_from_uri(uri: str, name: str, artist: str | None) -> dict[str, Any] | None:
+    """A seed is a track Music Assistant can find similar tracks for."""
+    provider, _, path = str(uri or "").partition("://")
+    media_type, _, item_id = path.partition("/")
+    if not provider or media_type != "track" or not item_id:
+        return None
+    return {"provider": provider, "item_id": item_id, "name": name, "artist": artist or ""}
+
+
+async def _async_spotify_history_seeds(hass: HomeAssistant, entity_id: str) -> list[dict[str, Any]]:
+    """The user's Spotify top tracks (last weeks) and recently played tracks via SpotifyPlus."""
+    seeds: list[dict[str, Any]] = []
+
+    async def fetch(service: str, data: dict[str, Any]) -> list[dict[str, Any]]:
+        try:
+            response = await hass.services.async_call(
+                "spotifyplus", service, {"entity_id": entity_id, **data},
+                blocking=True, return_response=True,
+            )
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("SpotifyPlus %s failed: %s", service, err)
+            return []
+        result = (response or {}).get("result") or {}
+        items = result.get("items") if isinstance(result, dict) else None
+        return items if isinstance(items, list) else []
+
+    top, recent = await asyncio.gather(
+        fetch("get_users_top_tracks", {"time_range": "short_term", "limit": SEED_POOL}),
+        fetch("get_player_recent_tracks", {"limit": SEED_POOL}),
+    )
+    for track in [*top, *(entry.get("track") for entry in recent if isinstance(entry, dict))]:
+        if not isinstance(track, dict) or not track.get("id"):
+            continue
+        artists = track.get("artists") or []
+        artist = artists[0].get("name") if artists and isinstance(artists[0], dict) else None
+        seeds.append(
+            {"provider": "spotify", "item_id": track["id"], "name": track.get("name") or "",
+             "artist": artist or ""}
+        )
+    return seeds
+
+
+async def _async_ma_history_seeds(hass: HomeAssistant, entry_id: str, user: str | None) -> list[dict[str, Any]]:
+    """Fallback seeds: what was played last through Music Assistant, then favourite tracks."""
+    seeds: list[dict[str, Any]] = []
+    for extra in ({"order_by": "last_played_desc"}, {"favorite": True, "order_by": "random"}):
+        data = {"config_entry_id": entry_id, "media_type": "track", "limit": SEED_POOL, **extra}
+        if user:
+            data["username"] = user
+        try:
+            response = await hass.services.async_call(
+                "music_assistant", "get_library", data, blocking=True, return_response=True
+            )
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Music Assistant library seeds failed: %s", err)
+            continue
+        for item in (response or {}).get("items") or []:
+            artists = item.get("artists") or []
+            artist = artists[0].get("name") if artists and isinstance(artists[0], dict) else None
+            seed = _seed_from_uri(item.get("uri"), item.get("name") or "", artist)
+            if seed:
+                seeds.append(seed)
+    return seeds
+
+
+async def _async_similar(mass: Any, user: str | None, seed: dict[str, Any]) -> list[Any]:
+    kwargs = {
+        "item_id": seed["item_id"],
+        "provider_instance_id_or_domain": seed["provider"],
+        "limit": SIMILAR_LIMIT,
+        "allow_lookup": True,
+    }
+    try:
+        result = await _send(mass, "music/tracks/similar_tracks", user, **kwargs)
+    except Exception as err:  # noqa: BLE001
+        if not user:
+            _LOGGER.debug("Similar tracks for %s failed: %s", seed, err)
+            return []
+        try:
+            result = await mass.send_command("music/tracks/similar_tracks", **kwargs)
+        except Exception as err2:  # noqa: BLE001
+            _LOGGER.debug("Similar tracks for %s failed: %s", seed, err2)
+            return []
+    return result if isinstance(result, list) else []
+
+
+async def _async_spotify_rows(
+    hass: HomeAssistant, mass: Any, entry_id: str, user: str | None,
+    spotify_entity: str | None, row_limit: int,
+) -> list[dict[str, Any]]:
+    """Discovery rows built by Spotify's recommendation engine from the listening history."""
+    seeds: list[dict[str, Any]] = []
+    if spotify_entity:
+        seeds = await _async_spotify_history_seeds(hass, spotify_entity)
+    if not seeds:
+        seeds = await _async_ma_history_seeds(hass, entry_id, user)
+    if not seeds:
+        return []
+
+    unique: dict[str, dict[str, Any]] = {}
+    for seed in seeds:
+        unique.setdefault(f"{seed['name'].lower()}|{seed['artist'].lower()}", seed)
+    pool = list(unique.values())
+    # A different handful of seeds on every refresh keeps the feed moving while
+    # each seed's answer stays cached by Music Assistant.
+    chosen = random.sample(pool, min(SEED_COUNT, len(pool)))
+
+    answers = await asyncio.gather(*(_async_similar(mass, user, seed) for seed in chosen))
+    known = {f"{s['name'].lower()}|{s['artist'].lower()}" for s in pool}
+
+    def items_for(raw_items: list[Any], reason: str) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        for raw_item in raw_items:
+            try:
+                item = _serialize_item(mass, raw_item, reason)
+            except HomeAssistantError:
+                continue
+            if f"{item['name'].lower()}|{(item['artist'] or '').split(',')[0].lower()}" in known:
+                continue
+            items.append(item)
+        return items
+
+    per_seed = [(seed, items_for(raw, "spotify")) for seed, raw in zip(chosen, answers)]
+    per_seed = [(seed, items) for seed, items in per_seed if items]
+    if not per_seed:
+        return []
+
+    mix: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index in range(max(len(items) for _, items in per_seed)):
+        for _, items in per_seed:
+            if index < len(items) and items[index]["uri"] not in seen:
+                seen.add(items[index]["uri"])
+                mix.append(items[index])
+    rows = [
+        {
+            "id": "spotify/for_you",
+            "name": "Recommended for you",
+            "translation_key": "for_you",
+            "subtitle": None,
+            "icon": "mdi-spotify",
+            "source": SOURCE_SPOTIFY,
+            "items": mix[: max(row_limit, 24)],
+        }
+    ]
+    artists_done: set[str] = set()
+    for seed, items in per_seed:
+        if len(rows) > SEED_ROWS or not seed["artist"] or seed["artist"].lower() in artists_done:
+            continue
+        artists_done.add(seed["artist"].lower())
+        rows.append(
+            {
+                "id": f"spotify/because/{seed['item_id']}",
+                "name": f"Because you listen to {seed['artist']}",
+                "translation_key": "because_you_listen",
+                "seed": seed["artist"],
+                "seed_track": seed["name"],
+                "subtitle": None,
+                "icon": "mdi-account-music",
+                "source": SOURCE_SPOTIFY,
+                "items": items[:row_limit],
+            }
+        )
+    return rows
+
+
+async def async_get_recommendations(call: ServiceCall) -> dict[str, list[dict[str, Any]]]:
+    """Return discovery rows from Spotify, Music Assistant, or both."""
+    mass = get_music_assistant_client(call.hass, call.data["config_entry_id"])
+    user = call.data.get("username")
+    row_limit = call.data["row_limit"]
+    source = call.data["source"]
+    rows: list[dict[str, Any]] = []
+    if source in (SOURCE_SPOTIFY, SOURCE_MIXED):
+        rows += await _async_spotify_rows(
+            call.hass, mass, call.data["config_entry_id"], user,
+            call.data.get("spotify_entity"), row_limit,
+        )
+    if source in (SOURCE_MUSIC_ASSISTANT, SOURCE_MIXED) or not rows:
+        rows += await _async_ma_rows(mass, user, row_limit, call.data["include_hidden"])
+    return {"rows": rows}

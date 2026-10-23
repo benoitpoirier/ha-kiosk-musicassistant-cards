@@ -59,6 +59,14 @@
         "include_hidden": {
           "name": "Inclure les lignes masquées",
           "description": "Retourne aussi les lignes que Music Assistant masque par défaut."
+        },
+        "source": {
+          "name": "Source",
+          "description": "music_assistant : lignes de Music Assistant. spotify : nouveaux titres du moteur de recommandation Spotify, à partir de votre historique d’écoute. mixed : lignes Spotify puis lignes Music Assistant."
+        },
+        "spotify_entity": {
+          "name": "Lecteur SpotifyPlus",
+          "description": "Lecteur SpotifyPlus du compte dont l’historique Spotify (top titres et écoutes récentes) sert de base aux recommandations. Sans lui, l’historique Music Assistant est utilisé."
         }
       }
     }

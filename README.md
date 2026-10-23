@@ -13,7 +13,7 @@ The package is a Home Assistant custom integration that:
 
 | Card | Type | Description |
 | --- | --- | --- |
-| Browser | `custom:kiosk-musicassistant-card` | Player, speaker switching, a *Discover* tab with Music Assistant recommendations, library categories, search with on-screen keyboard and navigation buttons in a single card. Visual editor included. |
+| Browser | `custom:kiosk-musicassistant-card` | Player, speaker switching, a *Discover* tab with new tracks recommended by Spotify from your listening history (and Music Assistant rows), library categories, search with on-screen keyboard and navigation buttons in a single card. Visual editor included. |
 | Now playing | `custom:kiosk-musicassistant-now-playing` | Full-screen now-playing view: cover art, progress, transport, volume, queue preview, synchronised lyrics and optional Spotify favourites. YAML configuration. |
 
 Interface languages: English, French and Dutch (follows Home Assistant, or set `language`).
@@ -84,6 +84,7 @@ music_sources:
     icon: mdi:spotify
     username: alice
     connect_entity: media_player.spotify_alice
+    spotify_entity: media_player.spotifyplus_alice
   - name: Bob
     icon: mdi:spotify
     username: bob
@@ -122,7 +123,9 @@ links:
 | `fill` | `false` | Fill the remaining screen height below the card (ignores `height`). |
 | `fill_margin` | `8` | Bottom margin in pixels when `fill` is enabled. |
 | `arrows` | `true` | Scroll buttons and a draggable scrollbar next to lists (for devices where touch scrolling is unreliable, e.g. cast displays). Also adds left/right buttons to the Discover carousels. |
-| `discover` | `true` | Show the *Discover* tab (first tab, opened by default) with Music Assistant's recommendation rows for the selected music source. |
+| `discover` | `true` | Show the *Discover* tab (first tab, opened by default). |
+| `discover_source` | `mixed` | `spotify`: new tracks from Spotify's recommendation engine, seeded with your listening history. `music_assistant`: Music Assistant's own rows. `mixed`: Spotify rows first, then Music Assistant rows. |
+| `spotify_entity` | none | SpotifyPlus `media_player` whose Spotify history seeds the recommendations when the selected music source has no `spotify_entity`. |
 | `discover_hidden_rows` | `true` | Also show the rows Music Assistant hides by default (random, forgotten, most played, ...). `false` keeps only the default rows. YAML only. |
 | `kiosk_theme` | `true` | Kiosk styling with large touch targets. Set to `false` to follow the plain Home Assistant theme. |
 | `language` | HA language | `en`, `fr` or `nl`. |
@@ -159,6 +162,7 @@ Lets several people switch between their own accounts (for example one Spotify a
 | `name`, `icon` | Label and icon of the button. |
 | `username` | **Required.** Music Assistant username. |
 | `connect_entity` | Optional Spotify `media_player` of this account; the current Spotify Connect track is resumed when switching source. |
+| `spotify_entity` | Optional [SpotifyPlus](https://github.com/thlucas1/homeassistantcomponent_spotifyplus) `media_player` of this account. Its Spotify listening history (top tracks of the last weeks, recently played) seeds the *Discover* recommendations. |
 
 The selected source is remembered per dashboard in the browser local storage.
 
@@ -183,7 +187,12 @@ To find a media id: **Developer tools > Actions > Music Assistant: Search**, ena
 
 ### Discover tab
 
-The *Discover* tab shows the rows Music Assistant builds on its home screen (recently played, recently added, provider recommendations, ...) as horizontal carousels, with a featured pick on top. Tap a cover to open an album, playlist or artist; tap the round play button to play it straight away. With `music_sources`, the rows are fetched for the selected Music Assistant user. The feed is cached for 10 minutes; the refresh button reloads it.
+The *Discover* tab proposes music as horizontal carousels, with a featured pick on top:
+
+- **Spotify recommendations** (`discover_source: spotify` or `mixed`): *Recommended for you* and *Because you listen to …* rows of new tracks. A handful of tracks from your Spotify history are picked as seeds (top tracks of the last weeks and recently played, read with SpotifyPlus through `spotify_entity`); without SpotifyPlus, the tracks last played and the favourite tracks in Music Assistant are used. Spotify's recommendation engine is reached through Music Assistant's Spotify provider (`music/tracks/similar_tracks`, the same call as Music Assistant's radio mode): Spotify removed its recommendation endpoints from the public Web API in November 2024, so SpotifyPlus can no longer call them directly. Every refresh picks other seeds.
+- **Music Assistant rows** (`music_assistant` or `mixed`): the rows of Music Assistant's home screen (recently played, recently added, random, forgotten, most played…).
+
+Tapping a recommended track plays it and queues the rest of the row. Tap a cover to open an album, playlist or artist; tap the round play button to play it straight away. With `music_sources`, the rows are fetched for the selected Music Assistant user. The feed is cached for 10 minutes; the refresh button reloads it.
 
 ### `links`
 
@@ -260,10 +269,12 @@ data:
   username: alice        # optional Music Assistant user
   row_limit: 20          # optional, items per row (1-50)
   include_hidden: false  # optional, also rows MA hides by default
+  source: mixed          # optional: music_assistant (default), spotify or mixed
+  spotify_entity: media_player.spotifyplus_alice  # optional, Spotify history for the seeds
 response_variable: discover
 ```
 
-Returns `rows`, each with `id`, `name`, `translation_key`, `subtitle`, `icon` and `items` (same fields as above). Used by the *Discover* tab. When the Music Assistant server rejects the `username` argument, the feed of the account Home Assistant is connected with is returned instead.
+Returns `rows`, each with `id`, `name`, `translation_key`, `subtitle`, `icon`, `source` (`spotify` or `music_assistant`), `seed` (artist, for *because you listen to* rows) and `items` (same fields as above). Used by the *Discover* tab. When the Music Assistant server rejects the `username` argument, the feed of the account Home Assistant is connected with is returned instead.
 
 ## Finding the Music Assistant `config_entry_id`
 

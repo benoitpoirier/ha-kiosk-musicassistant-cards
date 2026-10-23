@@ -48,3 +48,16 @@ get_recommendations:
       default: false
       selector:
         boolean:
+    source:
+      default: music_assistant
+      selector:
+        select:
+          options:
+            - music_assistant
+            - spotify
+            - mixed
+    spotify_entity:
+      selector:
+        entity:
+          integration: spotifyplus
+          domain: media_player
