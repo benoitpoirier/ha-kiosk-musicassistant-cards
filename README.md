@@ -289,12 +289,12 @@ action: kiosk_musicassistant_cards.get_queue_items
 data:
   config_entry_id: <your_music_assistant_config_entry_id>
   queue_id: media_player.living_room   # the player's active_queue attribute
-  offset: 40   # optional, default: two items before the current track
+  offset: 40   # optional, default: the current track
   limit: 25    # optional, 1-100 (default 50)
 response_variable: queue
 ```
 
-Returns `queue_id`, `current_index`, `total`, `offset` and `items` (`index`, `queue_item_id`, `name`, `artist`, `image`, `duration`). The now-playing card uses it for its queue panel: it opens on the current track with two pages loaded and fetches 25 more items whenever the list is scrolled near either end.
+Returns `queue_id`, `current_index`, `total`, `offset` and `items` (`index`, `queue_item_id`, `name`, `artist`, `image`, `duration`). The now-playing card uses it for its queue panel: it lists the track playing and the tracks to come (played tracks are not shown), with two pages loaded and 25 more fetched whenever the list is scrolled near the end.
 
 ### `kiosk_musicassistant_cards.play_now`
 

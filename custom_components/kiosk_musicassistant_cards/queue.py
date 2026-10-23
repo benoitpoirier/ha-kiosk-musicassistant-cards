@@ -19,9 +19,9 @@ _LOGGER = logging.getLogger(__name__)
 
 PAGE_SIZE = 25
 MAX_PAGE_SIZE = 100
-# Without an offset the first page starts a little before the current track,
-# so the list opens on what is playing with the previous tracks just above.
-CONTEXT_BEFORE = 2
+# Without an offset the first page starts at the current track: played tracks
+# are not listed.
+CONTEXT_BEFORE = 0
 
 GET_QUEUE_ITEMS_SCHEMA = vol.Schema(
     {

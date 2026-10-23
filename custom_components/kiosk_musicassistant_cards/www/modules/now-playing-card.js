@@ -460,17 +460,28 @@ export class KioskNowPlayingCard extends HTMLElement {
 
   _queueHtml(t) {
     const qs = this._qs;
-    const total = qs ? qs.total : 0;
-    const head = `<div class="pane-head">${svg('mdi:playlist-music')}<span id="q-head">${esc(t.queue)}${total
-      ? ` · ${total} ${esc(total === 1 ? t.track1 : t.tracks)}` : ''}</span>
+    const head = `<div class="pane-head">${svg('mdi:playlist-music')}<span id="q-head">${esc(this._queueCountText(t))}</span>
       <button class="close" data-act="queue" aria-label="${esc(t.queue)}">${svg('mdi:close')}</button></div>`;
     if (!qs || qs.loading === 'all') return `<div class="pane">${head}<div class="pane-empty">${esc(t.queueLoading)}</div></div>`;
     if (!qs.items.length) return `<div class="pane">${head}<div class="pane-empty">${esc(t.queueEmpty)}</div></div>`;
     return `<div class="pane">${head}<div class="q-list" id="q-list">
-      <div class="q-more" id="q-top"${qs.start > 0 ? '' : ' hidden'}>${esc(t.queueLoading)}</div>
-      <div id="q-rows">${qs.items.map((item) => this._queueRowHtml(item, t)).join('')}</div>
+      <div class="q-more" id="q-top"${qs.start > this._queueFloor() ? '' : ' hidden'}>${esc(t.queueLoading)}</div>
+      <div id="q-rows">${qs.items.filter((item) => item.index >= this._queueFloor()).map((item) => this._queueRowHtml(item, t)).join('')}</div>
       <div class="q-more" id="q-bottom"${qs.start + qs.items.length < qs.total ? '' : ' hidden'}>${esc(t.queueLoading)}</div>
     </div></div>`;
+  }
+
+  // Played tracks are not listed: the list starts at the track playing.
+  _queueFloor() {
+    const current = this._qs && Number(this._qs.current);
+    return Number.isFinite(current) && current > 0 ? current : 0;
+  }
+
+  // Tracks still to come, the one playing included.
+  _queueCountText(t) {
+    const qs = this._qs;
+    const left = qs ? Math.max(0, qs.total - this._queueFloor()) : 0;
+    return `${t.queue}${left ? ` · ${left} ${left === 1 ? t.track1 : t.tracks}` : ''}`;
   }
 
   async _queuePage(offset, limit) {
@@ -523,7 +534,7 @@ export class KioskNowPlayingCard extends HTMLElement {
     const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 400;
     const nearTop = list.scrollTop < 300;
     if (nearBottom && qs.start + qs.items.length < qs.total) this._queueMore(1);
-    else if (nearTop && qs.start > 0) this._queueMore(-1);
+    else if (nearTop && qs.start > this._queueFloor()) this._queueMore(-1);
   }
 
   // Removes a row at once (it slides out) and asks Music Assistant to drop the
@@ -554,14 +565,14 @@ export class KioskNowPlayingCard extends HTMLElement {
     setTimeout(() => row.remove(), 450);
     const head = this.shadowRoot.getElementById('q-head');
     const t = this._t();
-    if (head) head.textContent = `${t.queue}${qs.total ? ` · ${qs.total} ${qs.total === 1 ? t.track1 : t.tracks}` : ''}`;
+    if (head) head.textContent = this._queueCountText(t);
   }
 
   async _queueMore(direction) {
     const qs = this._qs;
     const t = this._t();
     qs.loading = direction > 0 ? 'down' : 'up';
-    const offset = direction > 0 ? qs.start + qs.items.length : Math.max(0, qs.start - QUEUE_PAGE);
+    const offset = direction > 0 ? qs.start + qs.items.length : Math.max(this._queueFloor(), qs.start - QUEUE_PAGE);
     const limit = direction > 0 ? QUEUE_PAGE : qs.start - offset;
     let items = [];
     try {
@@ -588,11 +599,11 @@ export class KioskNowPlayingCard extends HTMLElement {
       qs.start = offset;
       rows.insertAdjacentHTML('afterbegin', html);
       list.scrollTop += list.scrollHeight - before;
-      if (!items.length) qs.start = 0;
+      if (!items.length) qs.start = this._queueFloor();
     }
     const top = this.shadowRoot.getElementById('q-top');
     const bottom = this.shadowRoot.getElementById('q-bottom');
-    if (top) top.hidden = qs.start <= 0;
+    if (top) top.hidden = qs.start <= this._queueFloor();
     if (bottom) bottom.hidden = qs.start + qs.items.length >= qs.total;
   }
 

@@ -88,7 +88,7 @@
         },
         "offset": {
           "name": "Décalage",
-          "description": "Premier élément retourné. Par défaut : deux éléments avant le titre en cours."
+          "description": "Premier élément retourné. Par défaut : le titre en cours."
         },
         "limit": {
           "name": "Limite",
