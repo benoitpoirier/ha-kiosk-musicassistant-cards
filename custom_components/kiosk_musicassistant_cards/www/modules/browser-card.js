@@ -1,6 +1,6 @@
 import {
   BIB_MAX, BIB_TTL, GROOT, KLEIN, KORT, RIJEN, SOORTEN, SOORT_VAN,
-  SPOTIFY_URI, SPEELT, VEILIG, categoriesParDefaut, esc, mmss, svg, taalVan,
+  SPOTIFY_URI, SPEELT, VEILIG, VOL_CSS, categoriesParDefaut, esc, mmss, svg, taalVan, volBind, volHtml, volShow,
 } from './shared.js';
 import { KIOSK_CSS, KIOSK_THEMES } from './kiosk-theme.js';
 
@@ -302,6 +302,7 @@ ha-icon { pointer-events:none; }
                 border-radius:999px; background:var(--ov1); color:var(--zacht);
                 font-size:12px; font-weight:600; }
 .links ha-icon { --mdc-icon-size:15px; }
+.volrow .vol-box { --vr-fill:var(--acc); --vr-rest:var(--ov2); --vr-on:var(--on-acc,#fff); }
 
 /* ambient light: the current artwork, heavily blurred, tints the whole card */
 .wrap { position:relative; isolation:isolate; }
@@ -1041,44 +1042,33 @@ export class MusicAssistantTouchCard extends HTMLElement {
     }
   }
 
-  // Een nummer uit een lijst starten. We zetten de hele lijst in de wachtrij,
-  // te beginnen bij het aangetikte nummer (de nummers ervoor komen erachter).
-  // Anders staat er maar een nummer in de wachtrij en doet 'volgende' niets.
+  // Start a track from a list. The whole list goes to Music Assistant in one
+  // command, starting at the tapped track (the ones before it go last): Music
+  // Assistant then owns the queue and moves on by itself, whatever happens to
+  // the card. Adding tracks afterwards from the browser could leave a queue of
+  // one when the card was closed or the follow-up call failed.
   async _speelLijst(uris, start, el) {
     const schoon = (uris || []).filter(Boolean);
     if (!schoon.length) return;
     const username = this._user();
     const i = Math.max(0, Math.min(start || 0, schoon.length - 1));
-    const rij = schoon.slice(i).concat(schoon.slice(0, i)).slice(0, 150);
+    const rij = schoon.slice(i).concat(schoon.slice(0, i)).slice(0, 100);
     const speler = this._speler();
     if (el) el.classList.add('bezig');
     this._opt = { state: 'playing', tot: Date.now() + 8000 };
+    this._vul = null;
     try {
       await this._voorbereiden();
       await this._startVolume();
-      // Eerst alleen het aangetikte nummer starten - dat gaat meteen.
-      // Music Assistant zoekt elk nummer apart op, dus de rest van de lijst
-      // schuiven we er daarna achteraan zonder erop te wachten.
       await this._call('music_assistant', 'play_media',
-        this._avecUser({ media_id: rij[0], enqueue: 'replace' }, username),
+        this._avecUser({ media_id: rij.length === 1 ? rij[0] : rij, enqueue: 'replace' }, username),
         { entity_id: speler });
-      if (el) el.classList.remove('bezig');
-      if (rij.length > 1) {
-        // Eerst een handjevol, zodat 'volgende' meteen iets heeft; daarna de rest.
-        const bij = (v) => this._call('music_assistant', 'play_media',
-          this._avecUser({ media_id: v, enqueue: 'add' }, username), { entity_id: speler });
-        this._vul = bij(rij.slice(1, 6))
-          .then(() => (rij.length > 6 ? bij(rij.slice(6)) : null))
-          .catch((e) => this._fout(e))
-          .then(() => { this._vul = null; });
-      } else this._vul = null;
-      return;
     } catch (e) {
       this._fout(e);
+    } finally {
+      if (el) el.classList.remove('bezig');
     }
-    if (el) el.classList.remove('bezig');
   }
-
   _fout(e) {
     const el = this.shadowRoot.getElementById('melding');
     if (!el) return;
@@ -1174,7 +1164,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
     const h = (this._cfg.height || 556) + 'px';
     const thema = this._cfg.kiosk_theme === false
       ? '' : `<style>${KIOSK_CSS}</style>`;
-    this.shadowRoot.innerHTML = `<style>${STYLE}</style>
+    this.shadowRoot.innerHTML = `<style>${STYLE}${VOL_CSS}</style>
       ${thema}
       <div class="wrap" style="--mc-h:${h};--zn:${this._zoneLijst().length}">
         <div class="col left">
@@ -1184,13 +1174,10 @@ export class MusicAssistantTouchCard extends HTMLElement {
             : ''}
           <div class="np" id="np"></div>
           <div class="volrow">
-            <button class="vk" data-act="vol-">${svg('min')}</button>
-            <button class="slider" id="slider" data-act="volset">
-              <div class="baan"></div><div class="fill" id="volfill"></div>
-              <div class="knop" id="volknop"></div>
-            </button>
-            <button class="vk" data-act="vol+">${svg('plus')}</button>
-            <div class="vollbl" id="vollbl"></div>
+            <button class="vk" data-vol="-1" aria-label="-">${svg('min')}</button>
+            ${volHtml('Volume')}
+            <button class="vk" data-vol="1" aria-label="+">${svg('plus')}</button>
+            <div class="vollbl vol-label" id="vollbl"></div>
           </div>
           <div id="melding"></div>
           <div class="links" id="links"></div>
@@ -1213,6 +1200,12 @@ export class MusicAssistantTouchCard extends HTMLElement {
       window.addEventListener('resize', this._maatLuister);
     }
     this.shadowRoot.addEventListener('click', (ev) => this._klik(ev));
+    volBind(this.shadowRoot, {
+      step: () => this._volStep(),
+      send: (pct) => this._call('media_player', 'volume_set',
+        { volume_level: Math.max(0, Math.min(1, pct / 100)) }, { entity_id: this._volEntity() })
+        .catch((e) => this._fout(e)),
+    });
     this.shadowRoot.addEventListener('pointerdown', (ev) => {
       const t = ev.composedPath().find((n) => n.dataset && n.dataset.act);
       if (t && (t.dataset.act === 'op' || t.dataset.act === 'neer')) {
@@ -1371,15 +1364,6 @@ export class MusicAssistantTouchCard extends HTMLElement {
     if (a === 'zone') this._wisselZone(i, t);
     else if (a === 'src') this._wisselSource(i);
     else if (a === 'link') this._ganaar(((this._cfg.links || [])[i] || {}).path);
-    else if (a === 'vol+') this._volStap(1);
-    else if (a === 'vol-') this._volStap(-1);
-    else if (a === 'volset') {
-      const r = t.getBoundingClientRect();
-      const f = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
-      this._call('media_player', 'volume_set',
-        { volume_level: Math.min(1, f * this._volMax() / 100) },
-        { entity_id: this._volEntity() });
-    }
     else if (a === 'shuffle') {
       const s = this._st(this._actief());
       this._bedien('shuffle_set', { shuffle: !(s && s.attributes.shuffle) }, t);
@@ -1894,14 +1878,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
 
     const vs = this._st(this._volEntity());
     const vol = vs && vs.attributes.volume_level != null ? vs.attributes.volume_level : 0;
-    const fill = sr.getElementById('volfill');
-    const lbl = sr.getElementById('vollbl');
-    const knop = sr.getElementById('volknop');
-    const pct = Math.round(vol * 100);
-    const stand = Math.max(0, Math.min(100, pct / this._volMax() * 100));
-    if (fill) fill.style.width = stand + '%';
-    if (knop) knop.style.left = stand + '%';
-    if (lbl) lbl.textContent = pct + '%';
+    volShow(sr, vol * 100, this._volMax());
 
     const s = this._st(ent);
     const np = sr.getElementById('np');
@@ -1924,7 +1901,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
     // Alleen hertekenen als er iets veranderd is - anders bouwt de kaart het
     // hoesje bij elke statuswijziging in huis opnieuw op en wordt hij traag.
     const sig = [ent, eigen, toon, titel, artiest, a.media_content_id,
-      pic.split('&cache=')[0], a.shuffle, a.repeat, a.media_duration].join('|');
+      pic.replace(/([?&])(token|cache)=[^&]*/g, '$1'), a.shuffle, a.repeat, a.media_duration].join('|');
     if (sig === this._npSig) { this._toonVoortgang(); return; }
     this._npSig = sig;
     // Speelt het ergens anders dan op de gekozen zone? Laat zien waar.

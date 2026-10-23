@@ -353,3 +353,123 @@ export const mmss = (s) => {
   const r = n % 60;
   return m + ':' + (r < 10 ? '0' : '') + r;
 };
+
+// ---------- volume control, shared by both cards ----------
+// A native range (keyboard, accessibility) restyled for touch: a 48px hit area,
+// a thumb and track that grow while the finger is on them, a value bubble, 1%
+// steps, and -/+ buttons that repeat while held. The value is sent while dragging
+// (at most 4 times a second) and once more on release; incoming state does not
+// move the slider while it is being touched or for 2 s after.
+export const VOL_CSS = `
+.vol-box { position:relative; flex:1 1 auto; min-width:60px; height:48px; display:flex; align-items:center;
+  --v:0%; --vr-track:8px; --vr-thumb:24px; }
+.vol-box.vol-active { --vr-track:14px; --vr-thumb:36px; }
+.vol-range { -webkit-appearance:none; appearance:none; width:100%; height:48px; margin:0; padding:0;
+  background:transparent; cursor:pointer; touch-action:pan-y; -webkit-tap-highlight-color:transparent; }
+.vol-range:focus { outline:none; }
+.vol-range::-webkit-slider-runnable-track { height:var(--vr-track); border-radius:99px; transition:height .15s ease;
+  background:linear-gradient(90deg,var(--vr-fill,#fff) 0 var(--v),var(--vr-rest,rgba(255,255,255,.2)) var(--v) 100%); }
+.vol-range::-webkit-slider-thumb { -webkit-appearance:none; width:var(--vr-thumb); height:var(--vr-thumb);
+  margin-top:calc((var(--vr-track) - var(--vr-thumb)) / 2); border-radius:50%; background:#fff;
+  box-shadow:0 2px 10px rgba(0,0,0,.45),0 0 0 6px rgba(255,255,255,.12);
+  transition:width .15s ease, height .15s ease, margin-top .15s ease; }
+.vol-range::-moz-range-track { height:var(--vr-track); border-radius:99px; background:var(--vr-rest,rgba(255,255,255,.2)); }
+.vol-range::-moz-range-progress { height:var(--vr-track); border-radius:99px; background:var(--vr-fill,#fff); }
+.vol-range::-moz-range-thumb { width:var(--vr-thumb); height:var(--vr-thumb); border:0; border-radius:50%; background:#fff; }
+.vol-bubble { position:absolute; bottom:calc(100% + 2px); left:clamp(20px,var(--v),calc(100% - 20px));
+  transform:translateX(-50%) translateY(6px) scale(.7); opacity:0; pointer-events:none; padding:5px 11px;
+  border-radius:12px; background:var(--vr-fill,#fff); color:var(--vr-on,#000); font-size:16px; font-weight:800;
+  font-variant-numeric:tabular-nums; box-shadow:0 6px 18px rgba(0,0,0,.35); transition:opacity .15s, transform .15s; }
+.vol-box.vol-active .vol-bubble { opacity:1; transform:translateX(-50%) scale(1); }
+`;
+
+export const volHtml = (label) => `<div class="vol-box"><input class="vol-range" type="range" min="0" max="100"
+  step="1" value="0" aria-label="${esc(label)}"><output class="vol-bubble"></output></div>`;
+
+const volPaint = (range) => {
+  const max = Number(range.max) || 100;
+  const value = Number(range.value) || 0;
+  const box = range.parentElement;
+  box.style.setProperty('--v', `${Math.max(0, Math.min(100, (value / max) * 100))}%`);
+  const bubble = box.querySelector('.vol-bubble');
+  if (bubble) bubble.textContent = `${value}%`;
+  const label = range.getRootNode().querySelector('.vol-label');
+  if (label) label.textContent = `${value}%`;
+};
+
+// Shows the player's volume (percent) unless the slider is being touched.
+export const volShow = (root, percent, max) => {
+  const range = root.querySelector('.vol-range');
+  if (!range) return;
+  if (max && range.max !== String(max)) range.max = String(max);
+  if (range._busyUntil && Date.now() < range._busyUntil) return;
+  const value = String(Math.round(percent));
+  if (range.value !== value || !range.parentElement.style.getPropertyValue('--v')) {
+    range.value = value;
+    volPaint(range);
+  }
+};
+
+// Wires every .vol-range and [data-vol] button inside root. send(percent) sets
+// the volume; step() returns the button step in percent.
+export const volBind = (root, { send, step }) => {
+  let last = 0;
+  let timer = null;
+  let hold = null;
+  const range = () => root.querySelector('.vol-range');
+  const push = (value, now) => {
+    clearTimeout(timer);
+    const go = () => { last = Date.now(); send(value); };
+    const wait = 250 - (Date.now() - last);
+    if (now || wait <= 0) go(); else timer = setTimeout(go, wait);
+  };
+  const active = (r, on) => {
+    r.parentElement.classList.toggle('vol-active', on);
+    r._busyUntil = on ? Infinity : Date.now() + 2000;
+  };
+  const isRange = (node) => node && node.classList && node.classList.contains('vol-range');
+  root.addEventListener('input', (event) => {
+    if (!isRange(event.target)) return;
+    active(event.target, true);
+    volPaint(event.target);
+    push(Number(event.target.value));
+  });
+  root.addEventListener('change', (event) => {
+    if (!isRange(event.target)) return;
+    active(event.target, false);
+    volPaint(event.target);
+    push(Number(event.target.value), true);
+  });
+  root.addEventListener('pointerdown', (event) => {
+    const path = event.composedPath();
+    const touched = path.find(isRange);
+    if (touched) { active(touched, true); return; }
+    const button = path.find((node) => node && node.dataset && node.dataset.vol);
+    const r = range();
+    if (!button || !r) return;
+    const direction = Number(button.dataset.vol);
+    const tick = () => {
+      const max = Number(r.max) || 100;
+      r.value = String(Math.max(0, Math.min(max, Math.round(Number(r.value) + direction * step()))));
+      active(r, true);
+      volPaint(r);
+      push(Number(r.value));
+    };
+    tick();
+    clearTimeout(hold);
+    hold = setTimeout(function repeat() { tick(); hold = setTimeout(repeat, 110); }, 450);
+  });
+  const release = () => {
+    const r = range();
+    const held = hold !== null;
+    clearTimeout(hold);
+    hold = null;
+    if (r && r.parentElement.classList.contains('vol-active')) {
+      active(r, false);
+      if (held) push(Number(r.value), true);
+    }
+  };
+  // On the window: the finger may leave the button or the card before lifting.
+  window.addEventListener('pointerup', release);
+  window.addEventListener('pointercancel', release);
+};

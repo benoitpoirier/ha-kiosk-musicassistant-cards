@@ -1,4 +1,4 @@
-import { VEILIG, esc, svg, taalVan } from './shared.js';
+import { VEILIG, VOL_CSS, esc, svg, taalVan, volBind, volHtml, volShow } from './shared.js';
 import { THEME_COLORS } from './kiosk-theme.js';
 
 const DOMAIN = 'kiosk_musicassistant_cards';
@@ -139,15 +139,7 @@ ha-icon { pointer-events:none; }
 .volume-row:empty { display:none; }
 .volume-row .btn { width:44px; height:44px; color:rgba(255,255,255,.75); }
 .volume-row .btn ha-icon { --mdc-icon-size:22px; }
-.volume-range { -webkit-appearance:none; appearance:none; flex:1; min-width:40px; height:44px; margin:0 4px;
-  background:transparent; cursor:pointer; touch-action:pan-y; }
-.volume-range::-webkit-slider-runnable-track { height:6px; border-radius:99px;
-  background:linear-gradient(90deg,#fff 0 var(--v,0%),rgba(255,255,255,.2) var(--v,0%) 100%); }
-.volume-range::-webkit-slider-thumb { -webkit-appearance:none; width:20px; height:20px; margin-top:-7px;
-  border-radius:50%; background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.45); }
-.volume-range::-moz-range-track { height:6px; border-radius:99px; background:rgba(255,255,255,.2); }
-.volume-range::-moz-range-progress { height:6px; border-radius:99px; background:#fff; }
-.volume-range::-moz-range-thumb { width:20px; height:20px; border:0; border-radius:50%; background:#fff; }
+.volume-row .vol-box { --vr-fill:#fff; --vr-rest:rgba(255,255,255,.22); --vr-on:#0a141c; margin:0 4px; }
 .vol-label { min-width:48px; padding-right:12px; text-align:right; font-size:13px; font-weight:750;
   color:rgba(255,255,255,.8); font-variant-numeric:tabular-nums; }
 .notice { position:absolute; left:50%; bottom:16px; z-index:2; max-width:80%; transform:translateX(-50%);
@@ -225,7 +217,7 @@ export class KioskNowPlayingCard extends HTMLElement {
 
   _volumeStep() {
     const step = parseFloat(this._cfg.volume_step);
-    return (Number.isFinite(step) && step > 0 && step <= 100 ? step : 5) / 100;
+    return Number.isFinite(step) && step > 0 && step <= 100 ? step : 1;
   }
 
   connectedCallback() {
@@ -255,7 +247,7 @@ export class KioskNowPlayingCard extends HTMLElement {
   _build() {
     const height = Math.max(420, Math.min(780, Number(this._cfg.height) || 560));
     const t = this._t();
-    this.shadowRoot.innerHTML = `<style>${NOW_PLAYING_STYLE}</style>
+    this.shadowRoot.innerHTML = `<style>${NOW_PLAYING_STYLE}${VOL_CSS}</style>
       <section class="shell" style="--now-playing-height:${height}px;${this._themeStyle()}">
         <div class="background" id="background"></div><div class="shade"></div>
         <div class="layout">
@@ -281,8 +273,15 @@ export class KioskNowPlayingCard extends HTMLElement {
         <div class="notice" id="notice"></div>
       </section>`;
     this.shadowRoot.addEventListener('click', (event) => this._click(event));
-    this.shadowRoot.addEventListener('change', (event) => this._change(event));
-    this.shadowRoot.addEventListener('input', (event) => this._input(event));
+    volBind(this.shadowRoot, {
+      step: () => this._volumeStep(),
+      send: (percent) => {
+        if (!this._entity || !this._hass) return;
+        this._hass.callService('media_player', 'volume_set',
+          { volume_level: Math.max(0, Math.min(1, percent / 100)) }, { entity_id: this._entity })
+          .catch((error) => { this._notice = error && error.message ? error.message : String(error); this._sync(); });
+      },
+    });
     this._startProgressTimer();
     if (this._cfg.fill === true) {
       requestAnimationFrame(() => this._fillHeight());
@@ -387,9 +386,10 @@ export class KioskNowPlayingCard extends HTMLElement {
     }
     const picture = VEILIG(attributes.entity_picture_local || attributes.entity_picture || '');
     const signature = [entity, state && state.state, attributes.media_title, attributes.media_artist,
-      attributes.media_album_name, attributes.media_content_id, picture, attributes.active_queue,
+      attributes.media_album_name, attributes.media_content_id,
+      picture.replace(/([?&])(token|cache)=[^&]*/g, '$1'), attributes.active_queue,
       attributes.shuffle, attributes.repeat, attributes.supported_features,
-      attributes.volume_level, this._selected,
+      Number.isFinite(Number(attributes.volume_level)), this._selected,
       this._queueContext && this._queueContext.provider,
       this._queueContext && this._queueContext.itemId,
       this._queueContext && this._queueContext.favorite,
@@ -403,6 +403,7 @@ export class KioskNowPlayingCard extends HTMLElement {
       this._signature = signature;
       this._render(state, attributes, picture);
     }
+    this._syncVolume(attributes);
     this._updateProgress();
   }
 
@@ -433,6 +434,20 @@ export class KioskNowPlayingCard extends HTMLElement {
     return `<div class="pane">${head}<div class="q-list">${rows}${more}</div></div>`;
   }
 
+  // Replaces an element's content only when it really changed, so a state
+  // update elsewhere in the house does not rebuild (and flash) the controls.
+  _patch(id, html) {
+    const el = this.shadowRoot.getElementById(id);
+    if (!el || el._html === html) return false;
+    el._html = html;
+    el.innerHTML = html;
+    return true;
+  }
+
+  _syncVolume(attributes) {
+    const volume = Number(attributes.volume_level);
+    if (Number.isFinite(volume)) volShow(this.shadowRoot, volume * 100, 100);
+  }
   _render(state, attributes, picture) {
     const entity = this._entity;
     const configured = this._players.find((player) => player.entity === entity) || {};
@@ -450,35 +465,52 @@ export class KioskNowPlayingCard extends HTMLElement {
     });
     const provider = this._provider(attributes);
 
-    const status = $('status');
-    status.classList.toggle('playing', !!playing);
-    status.innerHTML = `<span class="eq"><i></i><i></i><i></i></span>
+    $('status').classList.toggle('playing', !!playing);
+    this._patch('status', `<span class="eq"><i></i><i></i><i></i></span>
       <span class="st-label">${esc(playing ? t.playing : paused ? t.paused : t.stopped)}</span>
-      <span class="st-player">${svg('mdi:speaker')}<span>${esc(playerName)}</span></span>`;
-    $('players').innerHTML = activePlayers.length > 1
+      <span class="st-player">${svg('mdi:speaker')}<span>${esc(playerName)}</span></span>`);
+    this._patch('players', activePlayers.length > 1
       ? activePlayers.map((player) => `<button class="${player.entity === entity ? 'active' : ''}"
           data-act="player" data-entity="${esc(player.entity)}">${svg('mdi:speaker')}<span>${esc(player.name || player.entity)}</span></button>`).join('')
-      : '';
+      : '');
 
-    const cover = $('cover');
-    if (this._queueOpen) cover.innerHTML = this._queueHtml(t);
-    else if (this._lyricsVisible && this._lyricsAvailable) {
-      cover.innerHTML = `<div class="pane lyrics-pane" id="lyrics-pane"><div class="lyrics-lines">${this._lyricsLines
-        .map((line, index) => `<div class="lyric-line${index === this._activeLyricIndex ? ' active' : ''}" data-lyric-index="${index}">${esc(line.text)}</div>`)
+    // The cover, the lyrics and the queue are only rebuilt when what they show
+    // changes. Home Assistant rotates the access token in the picture URL every
+    // few minutes: that is the same picture and must not reload the image.
+    const pictureKey = picture.replace(/([?&])(token|cache)=[^&]*/g, '$1');
+    let coverKey;
+    let coverHtml;
+    if (this._queueOpen) {
+      coverHtml = this._queueHtml(t);
+      coverKey = coverHtml;
+    } else if (this._lyricsVisible && this._lyricsAvailable) {
+      // No 'active' class here: _updateLyrics moves it without a rebuild.
+      coverHtml = `<div class="pane lyrics-pane" id="lyrics-pane"><div class="lyrics-lines">${this._lyricsLines
+        .map((line, index) => `<div class="lyric-line" data-lyric-index="${index}">${esc(line.text)}</div>`)
         .join('')}</div></div>`;
+      coverKey = `lyrics|${this._queueContextKey}|${this._lyricsLines.length}`;
     } else {
-      cover.innerHTML = picture ? `<img class="cover" src="${esc(picture)}" alt="${esc(t.coverOf)} ${esc(title)}">`
+      coverHtml = picture ? `<img class="cover" src="${esc(picture)}" alt="${esc(t.coverOf)} ${esc(title)}">`
         : `<div class="cover-empty">${svg('mdi:music')}</div>`;
+      coverKey = `img|${pictureKey}`;
     }
-    $('background').style.backgroundImage = picture
-      ? `url("${picture.replace(/["\\\n\r]/g, '')}")` : '';
-
+    const cover = $('cover');
+    if (cover._key !== coverKey) {
+      cover._key = coverKey;
+      cover.innerHTML = coverHtml;
+      this._activeLyricIndex = -1;
+    }
+    const background = $('background');
+    if (background._key !== pictureKey) {
+      background._key = pictureKey;
+      background.style.backgroundImage = picture ? `url("${picture.replace(/["\\\n\r]/g, '')}")` : '';
+    }
     $('title').textContent = title;
     $('artist').textContent = artist;
     $('album').textContent = album && album !== title ? album : '';
     const providerIcon = /spotify/i.test(provider) ? 'mdi:spotify'
       : /youtube/i.test(provider) ? 'mdi:youtube' : /radio/i.test(provider) ? 'mdi:radio' : 'mdi:music-circle-outline';
-    $('context').innerHTML = provider ? `${svg(providerIcon)}<span>${esc(provider)}</span>` : '';
+    this._patch('context', provider ? `${svg(providerIcon)}<span>${esc(provider)}</span>` : '');
 
     const duration = Number(attributes.media_duration) || 0;
     const progress = $('progress');
@@ -493,34 +525,31 @@ export class KioskNowPlayingCard extends HTMLElement {
     const repeat = this._supports(attributes, 131072)
       ? button(`sm${attributes.repeat && attributes.repeat !== 'off' ? ' on' : ''}`, 'repeat', t.repeat,
         attributes.repeat === 'one' ? 'mdi:repeat-once' : 'mdi:repeat') : '<span class="btn sm"></span>';
-    $('transport').innerHTML = `${shuffle}
+    this._patch('transport', `${shuffle}
       ${this._supports(attributes, 16) ? button('md', 'previous', t.previous, 'mdi:skip-previous') : ''}
       ${canPlayPause ? button('play', 'play-pause', playing ? t.pause : t.play, playing ? 'mdi:pause' : 'mdi:play') : ''}
       ${this._supports(attributes, 32) ? button('md', 'next', t.next, 'mdi:skip-next') : ''}
-      ${repeat}`;
+      ${repeat}`);
 
     const favorite = this._queueContext || {};
     const hasFavorite = !!favorite.favoriteAccount && !!favorite.itemId && typeof favorite.favorite === 'boolean';
     const hasQueue = !!(attributes.active_queue && this._cfg.config_entry_id);
     const favLabel = favorite.favorite ? t.favRemove : t.favAdd;
-    $('actions').innerHTML = [
+    this._patch('actions', [
       hasFavorite ? button(`fav${favorite.favorite ? ' on' : ''}`, 'favorite', favLabel,
         favorite.favorite ? 'mdi:heart' : 'mdi:heart-outline') : '',
       hasQueue ? button(this._queueOpen ? 'on' : '', 'queue', t.queue, 'mdi:playlist-music') : '',
       this._lyricsAvailable ? button(this._lyricsVisible ? 'on' : '', 'lyrics', t.lyrics, 'mdi:microphone-variant') : '',
-    ].join('');
+    ].join(''));
 
-    const volume = Number(attributes.volume_level);
-    const hasVolume = this._supports(attributes, 4) && Number.isFinite(volume);
-    const percent = Math.round((hasVolume ? volume : 0) * 100);
-    $('volume-row').innerHTML = hasVolume ? `
-      ${button('', 'volume-down', t.volDown, percent === 0 ? 'mdi:volume-off' : 'mdi:volume-low')}
-      <input class="volume-range" data-act="volume" type="range" min="0" max="1" step="0.01" value="${volume}"
-        style="--v:${percent}%" aria-label="Volume">
-      ${button('', 'volume-up', t.volUp, 'mdi:volume-high')}
-      <span class="vol-label" id="vol-label">${percent}%</span>` : '';
-    $('bottom').hidden = !hasVolume && !$('actions').innerHTML;
-    $('notice').textContent = this._notice;
+    // The slider itself is only built once; its value is set by _syncVolume.
+    const hasVolume = this._supports(attributes, 4) && Number.isFinite(Number(attributes.volume_level));
+    this._patch('volume-row', hasVolume ? `
+      <button class="btn" data-vol="-1" title="${esc(t.volDown)}" aria-label="${esc(t.volDown)}">${svg('mdi:volume-minus')}</button>
+      ${volHtml('Volume')}
+      <button class="btn" data-vol="1" title="${esc(t.volUp)}" aria-label="${esc(t.volUp)}">${svg('mdi:volume-plus')}</button>
+      <span class="vol-label"></span>` : '');
+    $('bottom').hidden = !hasVolume && !$('actions').innerHTML;    if ($('notice').textContent !== this._notice) $('notice').textContent = this._notice;
   }
 
   _time(seconds) {
@@ -577,7 +606,8 @@ export class KioskNowPlayingCard extends HTMLElement {
   }
 
   _updateLyrics(position) {
-    if (!this._lyricsAvailable || !this._lyricsLines.length) return;
+    // Hidden lyrics cost nothing: the active line is found when they are shown.
+    if (!this._lyricsVisible || !this._lyricsAvailable || !this._lyricsLines.length) return;
     let active = -1;
     for (let index = 0; index < this._lyricsLines.length; index++) {
       if (this._lyricsLines[index].time > position) break;
@@ -743,11 +773,6 @@ export class KioskNowPlayingCard extends HTMLElement {
     else if (target.dataset.act === 'repeat') {
       const repeat = attributes.repeat || 'off';
       this._service('repeat_set', { repeat: repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off' });
-    } else if (target.dataset.act === 'volume-down' || target.dataset.act === 'volume-up') {
-      const current = Number(attributes.volume_level) || 0;
-      const change = target.dataset.act === 'volume-up' ? this._volumeStep() : -this._volumeStep();
-      const volume = Math.max(0, Math.min(1, Math.round((current + change) * 100) / 100));
-      this._service('volume_set', { volume_level: volume });
     } else if (target.dataset.act === 'seek') {
       const rect = target.getBoundingClientRect();
       const duration = Number(attributes.media_duration) || 0;
@@ -764,22 +789,6 @@ export class KioskNowPlayingCard extends HTMLElement {
       this._activeLyricIndex = -1;
       this._signature = '';
       this._sync();
-    }
-  }
-
-  // Move the slider fill and the label while dragging; the volume is sent on release.
-  _input(event) {
-    const range = event.target;
-    if (!range || !range.dataset || range.dataset.act !== 'volume') return;
-    const percent = Math.round(Number(range.value) * 100);
-    range.style.setProperty('--v', `${percent}%`);
-    const label = this.shadowRoot.getElementById('vol-label');
-    if (label) label.textContent = `${percent}%`;
-  }
-
-  _change(event) {
-    if (event.target && event.target.dataset && event.target.dataset.act === 'volume') {
-      this._service('volume_set', { volume_level: Number(event.target.value) });
     }
   }
 
