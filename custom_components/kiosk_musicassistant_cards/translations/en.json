@@ -1,0 +1,44 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Kiosk Music Assistant Cards",
+        "description": "Load the Kiosk Music Assistant cards in the Home Assistant frontend.",
+        "data": {}
+      }
+    },
+    "abort": {
+      "already_configured": "Kiosk Music Assistant Cards is already configured."
+    }
+  },
+  "services": {
+    "get_track_lyrics": {
+      "name": "Get track lyrics",
+      "description": "Return the plain and synchronised (LRC) lyrics Music Assistant has for a track.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Music Assistant",
+          "description": "The Music Assistant config entry to query."
+        },
+        "uri": {
+          "name": "Track URI",
+          "description": "Music Assistant URI of the track."
+        }
+      }
+    },
+    "get_top_picks": {
+      "name": "Get top picks",
+      "description": "Return Music Assistant's recommendations, completed with recently played items.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Music Assistant",
+          "description": "The Music Assistant config entry to query."
+        },
+        "limit": {
+          "name": "Limit",
+          "description": "Maximum number of items to return."
+        }
+      }
+    }
+  }
+}

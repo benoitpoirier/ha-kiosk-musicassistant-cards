@@ -1,0 +1,44 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Kiosk Music Assistant Cards",
+        "description": "Charger les cartes Kiosk Music Assistant dans l’interface de Home Assistant.",
+        "data": {}
+      }
+    },
+    "abort": {
+      "already_configured": "Kiosk Music Assistant Cards est déjà configuré."
+    }
+  },
+  "services": {
+    "get_track_lyrics": {
+      "name": "Obtenir les paroles",
+      "description": "Retourne les paroles brutes et synchronisées (LRC) connues de Music Assistant pour un titre.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Music Assistant",
+          "description": "L’entrée de configuration Music Assistant à interroger."
+        },
+        "uri": {
+          "name": "URI du titre",
+          "description": "URI Music Assistant du titre."
+        }
+      }
+    },
+    "get_top_picks": {
+      "name": "Obtenir les meilleures sélections",
+      "description": "Retourne les recommandations de Music Assistant, complétées par les éléments récemment écoutés.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Music Assistant",
+          "description": "L’entrée de configuration Music Assistant à interroger."
+        },
+        "limit": {
+          "name": "Limite",
+          "description": "Nombre maximal d’éléments retournés."
+        }
+      }
+    }
+  }
+}
