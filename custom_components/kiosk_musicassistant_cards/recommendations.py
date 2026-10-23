@@ -5,12 +5,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import time
 from typing import Any
 
 import voluptuous as vol
 from homeassistant.components.music_assistant.helpers import get_music_assistant_client
 from homeassistant.components.music_assistant.schemas import media_item_dict_from_mass_item
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from music_assistant_models.media_items import media_from_dict
@@ -39,6 +40,10 @@ SEED_COUNT = 6
 SEED_ROWS = 3
 SIMILAR_LIMIT = 25
 SIMILAR_TIMEOUT = 15
+CACHE_TTL = 30 * 60
+KEEP_WARM = 24 * 3600
+DATA_CACHE = "kiosk_musicassistant_cards_recommendations"
+DOMAIN = "kiosk_musicassistant_cards"
 
 GET_TOP_PICKS_SCHEMA = vol.Schema(
     {
@@ -59,6 +64,7 @@ GET_RECOMMENDATIONS_SCHEMA = vol.Schema(
         vol.Optional("include_hidden", default=False): cv.boolean,
         vol.Optional("source", default=SOURCE_MUSIC_ASSISTANT): vol.In(SOURCES),
         vol.Optional("spotify_entity"): cv.entity_id,
+        vol.Optional("refresh", default=False): cv.boolean,
     }
 )
 
@@ -411,10 +417,77 @@ async def async_get_recommendations(call: ServiceCall) -> dict[str, list[dict[st
         source = SOURCE_SIMILAR
     rows: list[dict[str, Any]] = []
     if source in (SOURCE_SIMILAR, SOURCE_MIXED):
-        rows += await _async_similar_rows(
-            call.hass, mass, call.data["config_entry_id"], user,
-            call.data.get("spotify_entity"), row_limit,
-        )
+        params = {
+            "entry_id": call.data["config_entry_id"],
+            "user": user,
+            "spotify_entity": call.data.get("spotify_entity"),
+            "row_limit": row_limit,
+        }
+        rows += await _async_cached_similar_rows(call.hass, params, call.data["refresh"])
     if source in (SOURCE_MUSIC_ASSISTANT, SOURCE_MIXED) or not rows:
         rows += await _async_ma_rows(mass, user, row_limit, call.data["include_hidden"])
     return {"rows": rows}
+
+
+# ---------- cache ----------
+# Building the similar-track rows takes 15-45 s on a cold Music Assistant cache.
+# The last result is kept per (MA entry, user, Spotify account, row size) and
+# served at once; when it is older than CACHE_TTL it is still served and a
+# rebuild runs in the background (stale-while-revalidate). A timer rebuilds
+# the feeds that were asked for in the last day, so a kiosk opening Discover
+# almost never waits.
+
+def _store(hass: HomeAssistant) -> dict[tuple, dict[str, Any]]:
+    return hass.data.setdefault(DATA_CACHE, {})
+
+
+def _schedule(hass: HomeAssistant, key: tuple, params: dict[str, Any]) -> asyncio.Task:
+    entry = _store(hass).setdefault(
+        key, {"rows": None, "time": 0.0, "used": time.monotonic(), "task": None, "params": params}
+    )
+    task = entry["task"]
+    if task is not None and not task.done():
+        return task
+
+    async def build() -> list[dict[str, Any]]:
+        mass = get_music_assistant_client(hass, params["entry_id"])
+        rows = await _async_similar_rows(
+            hass, mass, params["entry_id"], params["user"], params["spotify_entity"],
+            params["row_limit"],
+        )
+        # An empty rebuild (a provider hiccup) does not wipe a good feed.
+        if rows or entry["rows"] is None:
+            entry["rows"] = rows
+        entry["time"] = time.monotonic()
+        return entry["rows"]
+
+    entry["task"] = hass.async_create_background_task(build(), f"{DOMAIN} recommendations")
+    return entry["task"]
+
+
+async def _async_cached_similar_rows(
+    hass: HomeAssistant, params: dict[str, Any], refresh: bool
+) -> list[dict[str, Any]]:
+    key = tuple(sorted(params.items()))
+    entry = _store(hass).get(key)
+    now = time.monotonic()
+    if entry is not None:
+        entry["used"] = now
+        if entry["rows"] is not None and not refresh:
+            if now - entry["time"] > CACHE_TTL:
+                _schedule(hass, key, params)
+            return entry["rows"]
+    # shield: a client that goes away must not cancel a build others will use.
+    return await asyncio.shield(_schedule(hass, key, params))
+
+
+@callback
+def async_keep_warm(hass: HomeAssistant) -> None:
+    """Rebuild the feeds used recently before they go stale; forget the others."""
+    store = _store(hass)
+    now = time.monotonic()
+    for key, entry in list(store.items()):
+        if now - entry["used"] > KEEP_WARM:
+            store.pop(key, None)
+        elif now - entry["time"] > CACHE_TTL * 0.8:
+            _schedule(hass, key, entry["params"])

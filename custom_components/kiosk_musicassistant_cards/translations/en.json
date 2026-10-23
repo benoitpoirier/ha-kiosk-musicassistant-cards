@@ -64,6 +64,7 @@
           "name": "Source",
           "description": "music_assistant: Music Assistant rows. similar: new tracks recommended by your music providers (Spotify, Tidal, YouTube Music, Deezer...) from your listening history. mixed: similar tracks first, then Music Assistant rows (falls back to Music Assistant rows when no provider can recommend)."
         },
+        "refresh": {"name": "Refresh","description": "Rebuild the recommendations now instead of returning the cached ones (cached 30 minutes, rebuilt in the background)."},
         "spotify_entity": {
           "name": "SpotifyPlus player",
           "description": "SpotifyPlus media player of the account whose Spotify listening history (top and recently played tracks) seeds the recommendations. Optional: without it, the Music Assistant listening history and favourites are used."

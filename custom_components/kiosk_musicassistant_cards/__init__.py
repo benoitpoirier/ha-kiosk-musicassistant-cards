@@ -1,5 +1,6 @@
 """Kiosk Music Assistant Cards for Home Assistant."""
 
+from datetime import timedelta
 from pathlib import Path
 
 import voluptuous as vol
@@ -9,6 +10,7 @@ from homeassistant.components.music_assistant.helpers import get_music_assistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.loader import async_get_integration
 from music_assistant_models.media_items import Track
 
@@ -18,6 +20,7 @@ from .recommendations import (
     GET_TOP_PICKS_SCHEMA,
     async_get_recommendations,
     async_get_top_picks,
+    async_keep_warm,
 )
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -67,6 +70,11 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         schema=GET_RECOMMENDATIONS_SCHEMA,
         supports_response=SupportsResponse.ONLY,
     )
+
+    async def _keep_warm(_now) -> None:
+        async_keep_warm(hass)
+
+    async_track_time_interval(hass, _keep_warm, timedelta(minutes=10))
     return True
 
 

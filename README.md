@@ -190,7 +190,7 @@ To find a media id: **Developer tools > Actions > Music Assistant: Search**, ena
 
 The *Discover* tab proposes music as horizontal carousels, with a featured pick on top:
 
-- **Similar tracks** (`discover_source: similar` or `mixed`): *Recommended for you* and *Because you listen to …* rows of new tracks. A handful of tracks from your listening history are picked as seeds and your music providers return similar tracks through Music Assistant (`music/tracks/similar_tracks`, the call behind Music Assistant's radio mode). This works with any provider that offers similar tracks (Spotify, Tidal, YouTube Music, Deezer…). The seeds are the tracks last played and the favourite tracks in Music Assistant; with a SpotifyPlus `spotify_entity`, your Spotify top tracks of the last weeks and recently played tracks are used instead, so the recommendations follow your whole Spotify history. Every refresh picks other seeds. Spotify removed its recommendation endpoints from the public Web API in November 2024; Music Assistant's Spotify provider still reaches them with its own session.
+- **Similar tracks** (`discover_source: similar` or `mixed`): *Recommended for you* and *Because you listen to …* rows of new tracks. A handful of tracks from your listening history are picked as seeds and your music providers return similar tracks through Music Assistant (`music/tracks/similar_tracks`, the call behind Music Assistant's radio mode). This works with any provider that offers similar tracks (Spotify, Tidal, YouTube Music, Deezer…). The seeds are the tracks last played and the favourite tracks in Music Assistant; with a SpotifyPlus `spotify_entity`, your Spotify top tracks of the last weeks and recently played tracks are used instead, so the recommendations follow your whole Spotify history. The result is cached by the integration for 30 minutes and rebuilt in the background (feeds used in the last day are kept warm every 10 minutes), so the tab opens instantly; the refresh button forces a rebuild with other seeds. Spotify removed its recommendation endpoints from the public Web API in November 2024; Music Assistant's Spotify provider still reaches them with its own session.
 - **Music Assistant rows** (`music_assistant` or `mixed`): the rows of Music Assistant's home screen (recently played, recently added, random, forgotten, most played…).
 
 Tapping a recommended track plays it and queues the rest of the row.
@@ -275,6 +275,7 @@ data:
   include_hidden: false  # optional, also rows MA hides by default
   source: mixed          # optional: music_assistant (default), similar or mixed
   spotify_entity: media_player.spotifyplus_alice  # optional, Spotify history for the seeds
+  refresh: false         # optional, rebuild instead of returning the cached rows
 response_variable: discover
 ```
 

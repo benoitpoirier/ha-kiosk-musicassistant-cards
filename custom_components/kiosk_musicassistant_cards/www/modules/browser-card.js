@@ -510,6 +510,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
       };
       if (this._user()) data.username = this._user();
       if (spotify && deel !== 'music_assistant') data.spotify_entity = spotify;
+      if (force && deel !== 'music_assistant') data.refresh = true;
       return this._ws({
         type: 'call_service', domain: DOMAIN, service: 'get_recommendations',
         service_data: data, return_response: true,

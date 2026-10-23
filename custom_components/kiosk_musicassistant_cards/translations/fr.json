@@ -64,6 +64,7 @@
           "name": "Source",
           "description": "music_assistant : lignes de Music Assistant. similar : nouveaux titres recommandés par vos fournisseurs musicaux (Spotify, Tidal, YouTube Music, Deezer…) selon votre historique d’écoute. mixed : titres similaires puis lignes Music Assistant (repli sur les lignes Music Assistant si aucun fournisseur ne sait recommander)."
         },
+        "refresh": {"name": "Actualiser","description": "Recalcule les recommandations au lieu de renvoyer celles en cache (cache de 30 minutes, recalculé en arrière-plan)."},
         "spotify_entity": {
           "name": "Lecteur SpotifyPlus",
           "description": "Lecteur SpotifyPlus du compte dont l’historique Spotify (top titres et écoutes récentes) sert de base aux recommandations. Facultatif : sans lui, l’historique d’écoute et les favoris Music Assistant sont utilisés."
