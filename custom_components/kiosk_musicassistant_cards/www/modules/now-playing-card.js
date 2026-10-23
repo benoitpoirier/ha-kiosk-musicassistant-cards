@@ -73,7 +73,7 @@ ha-icon { pointer-events:none; }
 /* right: one column as tall as the cover - status on top, controls at the bottom */
 .side { display:flex; flex-direction:column; justify-content:space-between; gap:16px; min-width:0;
   height:var(--cov); max-height:100%; }
-.top { display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0; }
+.top { display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0; min-height:44px; }
 .status { display:inline-flex; align-items:center; gap:9px; height:36px; max-width:100%; padding:0 14px 0 12px;
   border-radius:999px; background:rgba(255,255,255,.1); box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);
   font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; }
@@ -128,23 +128,25 @@ ha-icon { pointer-events:none; }
 .btn.play { width:clamp(76px,7.4cqw,94px); height:clamp(76px,7.4cqw,94px); background:#fff; color:#0a141c;
   box-shadow:0 18px 40px -10px rgba(0,0,0,.55),0 0 0 8px rgba(255,255,255,.08); }
 .btn.play ha-icon { --mdc-icon-size:46px; }
-.bottom { display:flex; align-items:center; gap:4px; min-height:60px; padding:6px; border-radius:999px;
+/* volume: the whole bottom bar, as wide as the column */
+.bottom { display:flex; align-items:center; min-height:64px; padding:8px 10px; border-radius:999px;
   background:rgba(255,255,255,.08); box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);
   -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); }
 .bottom[hidden] { display:none; }
-.actions { display:flex; gap:2px; flex:none; }
-.actions:empty { display:none; }
-.actions .btn { width:48px; height:48px; color:rgba(255,255,255,.82); }
-.actions .btn ha-icon { --mdc-icon-size:23px; }
-.actions .btn.on { background:#fff; color:#0a141c; }
-.actions .btn.fav.on { background:transparent; color:var(--np-acc); }
-.actions:not(:empty) + .volume-row { margin-left:6px; padding-left:8px; border-left:1px solid rgba(255,255,255,.14); }
-.volume-row { display:flex; flex:1; align-items:center; gap:2px; min-width:0; }
+.volume-row { display:flex; flex:1; align-items:center; gap:6px; min-width:0; }
 .volume-row:empty { display:none; }
-.volume-row .btn { width:44px; height:44px; color:rgba(255,255,255,.75); }
-.volume-row .btn ha-icon { --mdc-icon-size:22px; }
-.volume-row .vol-box { --vr-fill:#fff; --vr-rest:rgba(255,255,255,.22); --vr-on:#0a141c; margin:0 4px; }
-.vol-label { min-width:48px; padding-right:12px; text-align:right; font-size:13px; font-weight:750;
+.volume-row .btn { width:48px; height:48px; color:rgba(255,255,255,.85); background:rgba(255,255,255,.08); }
+.volume-row .btn ha-icon { --mdc-icon-size:24px; }
+/* favourite, queue, lyrics: small round buttons at the end of the top row */
+.actions { display:flex; gap:6px; flex:none; margin-left:auto; }
+.actions:empty { display:none; }
+.actions .btn { width:44px; height:44px; color:rgba(255,255,255,.85); background:rgba(255,255,255,.1);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); }
+.actions .btn ha-icon { --mdc-icon-size:22px; }
+.actions .btn.on { background:#fff; color:#0a141c; }
+.actions .btn.fav.on { background:rgba(255,255,255,.1); color:var(--np-acc); }
+.volume-row .vol-box { --vr-fill:#fff; --vr-rest:rgba(255,255,255,.22); --vr-on:#0a141c; margin:0 8px; height:52px; }
+.vol-label { min-width:52px; padding-right:10px; text-align:right; font-size:15px; font-weight:750;
   color:rgba(255,255,255,.8); font-variant-numeric:tabular-nums; }
 .notice { position:absolute; left:50%; bottom:16px; z-index:2; max-width:80%; transform:translateX(-50%);
   padding:9px 16px; border-radius:14px; background:rgba(127,29,29,.85); color:#ffe4e0; font-size:13px; }
@@ -255,7 +257,7 @@ export class KioskNowPlayingCard extends HTMLElement {
         <div class="layout">
           <div class="cover-area" id="cover"></div>
           <div class="side">
-            <div class="top"><div class="status" id="status"></div><div class="players" id="players"></div></div>
+            <div class="top"><div class="status" id="status"></div><div class="players" id="players"></div><div class="actions" id="actions"></div></div>
             <div class="mid">
               <div class="meta">
                 <div class="title" id="title"></div>
@@ -269,7 +271,7 @@ export class KioskNowPlayingCard extends HTMLElement {
               </button>
               <div class="transport" id="transport"></div>
             </div>
-            <div class="bottom" id="bottom"><div class="actions" id="actions"></div><div class="volume-row" id="volume-row"></div></div>
+            <div class="bottom" id="bottom"><div class="volume-row" id="volume-row"></div></div>
           </div>
         </div>
         <div class="notice" id="notice"></div>
@@ -660,7 +662,7 @@ export class KioskNowPlayingCard extends HTMLElement {
       ${volHtml('Volume')}
       <button class="btn" data-vol="1" title="${esc(t.volUp)}" aria-label="${esc(t.volUp)}">${svg('mdi:volume-plus')}</button>
       <span class="vol-label"></span>` : '');
-    $('bottom').hidden = !hasVolume && !$('actions').innerHTML;    if ($('notice').textContent !== this._notice) $('notice').textContent = this._notice;
+    $('bottom').hidden = !hasVolume;    if ($('notice').textContent !== this._notice) $('notice').textContent = this._notice;
   }
 
   _time(seconds) {

@@ -357,15 +357,19 @@ export const mmss = (s) => {
 // ---------- volume control, shared by both cards ----------
 // A native range (keyboard, accessibility) restyled for touch: a 48px hit area,
 // a thumb and track that grow while the finger is on them, a value bubble, 1%
-// steps, and -/+ buttons that repeat while held. The value is sent while dragging
+// steps, and -/+ buttons that repeat while held. Touch and mouse drag the value
+// relatively (like a jog dial): putting a finger down never changes the volume,
+// only moving it does, and a vertical swipe still scrolls the page. The value is sent while dragging
 // (at most 4 times a second) and once more on release; incoming state does not
 // move the slider while it is being touched or for 2 s after.
 export const VOL_CSS = `
 .vol-box { position:relative; flex:1 1 auto; min-width:60px; height:48px; display:flex; align-items:center;
+  touch-action:pan-y; cursor:grab; -webkit-user-select:none; user-select:none;
   --v:0%; --vr-track:8px; --vr-thumb:24px; }
-.vol-box.vol-active { --vr-track:14px; --vr-thumb:36px; }
+.vol-box.vol-active { --vr-track:14px; --vr-thumb:36px; cursor:grabbing; }
 .vol-range { -webkit-appearance:none; appearance:none; width:100%; height:48px; margin:0; padding:0;
-  background:transparent; cursor:pointer; touch-action:pan-y; -webkit-tap-highlight-color:transparent; }
+  background:transparent; pointer-events:none; -webkit-tap-highlight-color:transparent; }
+.vol-range:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 4px var(--vr-fill,#fff); }
 .vol-range:focus { outline:none; }
 .vol-range::-webkit-slider-runnable-track { height:var(--vr-track); border-radius:99px; transition:height .15s ease;
   background:linear-gradient(90deg,var(--vr-fill,#fff) 0 var(--v),var(--vr-rest,rgba(255,255,255,.2)) var(--v) 100%); }
@@ -440,10 +444,19 @@ export const volBind = (root, { send, step }) => {
     volPaint(event.target);
     push(Number(event.target.value), true);
   });
+  // Relative drag on the whole box; the range itself ignores the pointer.
+  let drag = null;
   root.addEventListener('pointerdown', (event) => {
     const path = event.composedPath();
-    const touched = path.find(isRange);
-    if (touched) { active(touched, true); return; }
+    const box = path.find((node) => node && node.classList && node.classList.contains('vol-box'));
+    if (box) {
+      const r = box.querySelector('.vol-range');
+      if (!r || event.button > 0) return;
+      drag = { box, r, x: event.clientX, v: Number(r.value) || 0, moved: false, id: event.pointerId };
+      try { box.setPointerCapture(event.pointerId); } catch (error) { /* not capturable */ }
+      active(r, true);
+      return;
+    }
     const button = path.find((node) => node && node.dataset && node.dataset.vol);
     const r = range();
     if (!button || !r) return;
@@ -459,7 +472,27 @@ export const volBind = (root, { send, step }) => {
     clearTimeout(hold);
     hold = setTimeout(function repeat() { tick(); hold = setTimeout(repeat, 110); }, 450);
   });
+  root.addEventListener('pointermove', (event) => {
+    if (!drag || event.pointerId !== drag.id) return;
+    const dx = event.clientX - drag.x;
+    if (!drag.moved && Math.abs(dx) < 6) return;
+    drag.moved = true;
+    const max = Number(drag.r.max) || 100;
+    const width = drag.box.getBoundingClientRect().width || 1;
+    const value = Math.max(0, Math.min(max, Math.round(drag.v + (dx / width) * max)));
+    if (String(value) === drag.r.value) return;
+    drag.r.value = String(value);
+    volPaint(drag.r);
+    push(value);
+  });
   const release = () => {
+    if (drag) {
+      const { r, moved } = drag;
+      drag = null;
+      active(r, false);
+      if (moved) push(Number(r.value), true);
+      return;
+    }
     const r = range();
     const held = hold !== null;
     clearTimeout(hold);
