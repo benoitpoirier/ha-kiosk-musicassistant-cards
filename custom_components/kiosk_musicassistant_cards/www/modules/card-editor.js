@@ -1,4 +1,5 @@
 import { KORT, TAAL } from './shared.js';
+import { KIOSK_THEMES } from './kiosk-theme.js';
 
 const EDSTYLE = `
 :host { display:block; }
@@ -161,6 +162,8 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         ] } } },
         { name: 'arrows', selector: { boolean: {} } },
         { name: 'kiosk_theme', selector: { boolean: {} } },
+        { name: 'theme', selector: { select: { mode: 'dropdown', options: KIOSK_THEMES
+          .map((value) => ({ value, label: (ed.themas || {})[value] || value })) } } },
         { name: 'language', selector: { select: { mode: 'dropdown', options: [
           { value: '', label: ed.automatisch },
           { value: 'nl', label: 'Nederlands' }, { value: 'en', label: 'English' },
@@ -175,6 +178,7 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         discover_source: c.discover_source === 'spotify' ? 'similar' : (c.discover_source || 'mixed'),
         arrows: c.arrows !== false,
         kiosk_theme: c.kiosk_theme !== false,
+        theme: KIOSK_THEMES.includes(c.theme) ? c.theme : 'sunset',
         language: c.language || '',
       },
       (v) => {
@@ -188,6 +192,7 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         else delete this._cfg.discover_source;
         this._cfg.arrows = !!v.arrows;
         if (v.kiosk_theme === false) this._cfg.kiosk_theme = false; else delete this._cfg.kiosk_theme;
+        if (v.theme && v.theme !== 'sunset') this._cfg.theme = v.theme; else delete this._cfg.theme;
         if (v.language) this._cfg.language = v.language; else delete this._cfg.language;
         this._melden();
       }

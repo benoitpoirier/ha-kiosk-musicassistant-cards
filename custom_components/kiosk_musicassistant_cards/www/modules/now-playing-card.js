@@ -1,115 +1,169 @@
 import { VEILIG, esc, svg, taalVan } from './shared.js';
+import { THEME_COLORS } from './kiosk-theme.js';
 
 const DOMAIN = 'kiosk_musicassistant_cards';
 
 const NOW_PLAYING_STYLE = `
-:host { display:block; width:100%; height:100%; min-height:420px; color:#fff;
-  --np-grad:linear-gradient(90deg,#f6b26b,#e5739b); }
+:host { display:block; width:100%; color:#fff; container-type:inline-size; container-name:np;
+  --np-acc:#f6b26b; --np-acc2:#e5739b; }
 * { box-sizing:border-box; }
-button { font:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent;
-  transition:transform .1s ease, background .15s ease, color .15s ease, opacity .15s ease; }
-button:active { transform:scale(.94); }
+button { font:inherit; color:inherit; border:0; background:none; padding:0; margin:0; cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+  transition:transform .12s ease, background .2s ease, color .2s ease, opacity .2s ease, box-shadow .2s ease; }
+button:active { transform:scale(.93); }
+button:disabled { opacity:.35; cursor:default; }
+ha-icon { pointer-events:none; }
 .shell { position:relative; isolation:isolate; width:100%; height:var(--now-playing-height,560px);
-  min-height:420px; max-height:var(--now-playing-max,780px); overflow:hidden; border-radius:26px; background:#0b1b24;
-  box-shadow:0 20px 50px rgba(0,0,0,.35); }
-.background { position:absolute; z-index:-2; inset:-60px; background-position:center; background-size:cover;
-  filter:blur(46px) saturate(1.35) brightness(.55); transform:scale(1.15); transition:background-image .6s ease; }
-.shade { position:absolute; z-index:-1; inset:0;
-  background:radial-gradient(120% 90% at 0% 0%,rgba(0,0,0,.05),rgba(0,0,0,.45)),
-    linear-gradient(105deg,rgba(6,22,32,.15),rgba(6,16,26,.78)); }
-.layout { position:relative; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-  grid-template-rows:minmax(0,1fr) auto; align-items:stretch; gap:16px 36px; height:100%; padding:32px 36px; }
-.cover-area { display:grid; grid-row:1 / span 2; min-width:0; min-height:0; place-items:center; }
-.cover,.cover-empty,.lyrics-pane { width:min(100%, calc(var(--now-playing-height,560px) - 64px), 560px);
-  aspect-ratio:1; border-radius:24px; box-shadow:0 30px 60px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.06); }
-.cover { object-fit:cover; }
-.cover-empty { display:grid; place-items:center; background:rgba(255,255,255,.06); color:rgba(255,255,255,.6); }
-.cover-empty ha-icon { --mdc-icon-size:88px; }
-.lyrics-pane { overflow:auto; background:rgba(0,0,0,.28); scrollbar-width:none; }
-.lyrics-pane::-webkit-scrollbar { display:none; }
-.lyrics-lines { display:flex; min-height:100%; flex-direction:column; align-items:center;
-  justify-content:center; gap:16px; padding:28px 22px; text-align:center; }
-.lyric-line { flex:none; color:rgba(255,255,255,.45); font-size:18px; font-weight:600;
-  line-height:1.35; overflow-wrap:anywhere; transition:color .25s, opacity .25s, font-size .25s; }
-.lyric-line.active { color:#fff; font-size:24px; font-weight:800; }
-.side { display:flex; grid-column:2; grid-row:1; min-width:0; min-height:0; flex-direction:column;
-  justify-content:center; gap:12px; padding:30px 0 0; }
-.bottom-controls { display:flex; grid-column:2; grid-row:2; min-width:0; flex-direction:column; gap:6px; }
-.status { position:absolute; top:18px; right:18px; z-index:1; display:flex; align-items:center; gap:8px;
-  max-width:calc(100% - 36px); padding:9px 15px; border-radius:999px; background:rgba(0,0,0,.32);
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);
-  font-size:13px; font-weight:650; letter-spacing:.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.status ha-icon { --mdc-icon-size:17px; flex:none; color:#f6b26b; }
-.players { display:flex; flex-wrap:wrap; gap:8px; min-height:0; }
+  min-height:420px; max-height:var(--now-playing-max,780px); overflow:hidden; border-radius:28px;
+  background:#0a141c; box-shadow:0 24px 60px rgba(0,0,0,.35); }
+.background { position:absolute; z-index:-3; inset:-90px; background-size:cover; background-position:center;
+  filter:blur(70px) saturate(1.6) brightness(.6); transform:scale(1.25); transition:background-image .8s ease; }
+.shade { position:absolute; z-index:-2; inset:0;
+  background:radial-gradient(90% 130% at 20% 50%,rgba(0,0,0,0) 0%,rgba(0,0,0,.22) 60%,rgba(0,0,0,.5) 100%),
+    linear-gradient(90deg,rgba(0,0,0,0) 35%,rgba(0,0,0,.32) 100%); }
+.layout { --pad:clamp(24px,3.6cqw,48px);
+  --cov:min(calc(var(--now-playing-height,560px) - var(--pad) * 2), 46cqw);
+  display:grid; grid-template-columns:var(--cov) minmax(0,1fr); gap:clamp(28px,4.5cqw,64px);
+  align-items:center; height:100%; padding:var(--pad); }
+
+/* left: cover, or the queue / lyrics in its place */
+.cover-area { position:relative; width:var(--cov); aspect-ratio:1; }
+.cover,.cover-empty,.pane { position:absolute; inset:0; width:100%; height:100%; border-radius:clamp(16px,2cqw,26px); }
+.cover { object-fit:cover; box-shadow:0 40px 80px -24px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.08);
+  animation:in .5s ease; }
+@keyframes in { from { opacity:0; transform:scale(.97); } to { opacity:1; transform:none; } }
+.cover-empty { display:grid; place-items:center; color:rgba(255,255,255,.45);
+  background:linear-gradient(145deg,rgba(255,255,255,.1),rgba(255,255,255,.03));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); }
+.cover-empty ha-icon { --mdc-icon-size:96px; }
+.pane { display:flex; flex-direction:column; overflow:hidden; background:rgba(10,14,20,.55);
+  -webkit-backdrop-filter:blur(24px) saturate(1.3); backdrop-filter:blur(24px) saturate(1.3);
+  box-shadow:0 40px 80px -24px rgba(0,0,0,.6),inset 0 0 0 1px rgba(255,255,255,.08); animation:in .3s ease; }
+.lyrics-pane { display:block; overflow:auto; scrollbar-width:none;
+  -webkit-mask-image:linear-gradient(transparent,#000 14%,#000 86%,transparent);
+  mask-image:linear-gradient(transparent,#000 14%,#000 86%,transparent); }
+.lyrics-pane::-webkit-scrollbar,.q-list::-webkit-scrollbar { display:none; }
+.lyrics-lines { display:flex; flex-direction:column; align-items:flex-start; gap:18px; padding:45% 30px; }
+.lyric-line { font-size:clamp(18px,2.1cqw,26px); font-weight:750; line-height:1.3; letter-spacing:-.01em;
+  color:rgba(255,255,255,.3); overflow-wrap:anywhere; transform-origin:left center;
+  transition:color .35s ease, transform .35s ease; }
+.lyric-line.active { color:#fff; transform:scale(1.04); }
+.pane-head { display:flex; align-items:center; gap:10px; padding:18px 16px 10px 22px; flex:none;
+  font-size:12.5px; font-weight:800; letter-spacing:.9px; text-transform:uppercase; color:rgba(255,255,255,.75); }
+.pane-head ha-icon { --mdc-icon-size:20px; color:var(--np-acc); }
+.pane-head .close { margin-left:auto; width:40px; height:40px; border-radius:50%; display:grid; place-items:center;
+  background:rgba(255,255,255,.1); }
+.pane-head .close ha-icon { color:#fff; }
+.q-list { flex:1; overflow:auto; scrollbar-width:none; padding:0 12px 12px; }
+.q-row { display:grid; grid-template-columns:64px minmax(0,1fr); gap:14px; align-items:center;
+  padding:10px; border-radius:16px; }
+.q-row.now { background:rgba(255,255,255,.09); }
+.q-row img,.q-ph { width:64px; height:64px; border-radius:10px; object-fit:cover; }
+.q-ph { display:grid; place-items:center; background:rgba(255,255,255,.08); color:rgba(255,255,255,.5); }
+.q-tx { min-width:0; }
+.q-label { font-size:11px; font-weight:800; letter-spacing:.8px; text-transform:uppercase; color:var(--np-acc); }
+.q-name { font-size:17px; font-weight:700; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.q-art { font-size:14px; color:rgba(255,255,255,.6); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.q-more,.pane-empty { padding:12px 14px; font-size:14px; color:rgba(255,255,255,.6); }
+
+/* right: one column as tall as the cover - status on top, controls at the bottom */
+.side { display:flex; flex-direction:column; justify-content:space-between; gap:16px; min-width:0;
+  height:var(--cov); max-height:100%; }
+.top { display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0; }
+.status { display:inline-flex; align-items:center; gap:9px; height:36px; max-width:100%; padding:0 14px 0 12px;
+  border-radius:999px; background:rgba(255,255,255,.1); box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);
+  font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; }
+.st-label { font-size:11.5px; font-weight:800; letter-spacing:.9px; text-transform:uppercase; color:var(--np-acc); }
+.st-player { display:inline-flex; align-items:center; gap:5px; min-width:0; overflow:hidden; text-overflow:ellipsis;
+  color:rgba(255,255,255,.85); }
+.st-player ha-icon { --mdc-icon-size:16px; flex:none; }
+.eq { display:inline-flex; align-items:flex-end; gap:2px; height:14px; flex:none; }
+.eq i { width:3px; height:4px; border-radius:2px; background:var(--np-acc); opacity:.6; }
+.status.playing .eq i { opacity:1; animation:eq 1s ease-in-out infinite; }
+.status.playing .eq i:nth-child(2) { animation-delay:-.45s; }
+.status.playing .eq i:nth-child(3) { animation-delay:-.7s; }
+@keyframes eq { 0%,100% { height:4px; } 50% { height:14px; } }
+.players { display:flex; flex-wrap:wrap; gap:6px; }
 .players:empty { display:none; }
-.players button { display:inline-flex; align-items:center; gap:7px; min-height:42px; padding:0 15px;
-  border:0; border-radius:999px; background:rgba(255,255,255,.1);
-  color:rgba(255,255,255,.8); font-size:14px; font-weight:600; }
-.players button.active { background:#fff; color:#0b1b24; }
-.players ha-icon { --mdc-icon-size:18px; }
-.title { max-height:2.24em; overflow:hidden; font-size:40px; font-weight:800; letter-spacing:-.8px; line-height:1.12;
-  overflow-wrap:anywhere; }
-.artist { overflow:hidden; color:rgba(255,255,255,.85); font-size:22px; font-weight:600; line-height:1.3;
-  text-overflow:ellipsis; white-space:nowrap; }
-.album { overflow:hidden; color:rgba(255,255,255,.6); font-size:17px; line-height:1.3; text-overflow:ellipsis; white-space:nowrap; }
-.context { align-self:flex-start; max-width:100%; overflow:hidden; padding:5px 11px; border-radius:999px;
-  background:rgba(255,255,255,.08); color:rgba(255,255,255,.7); font-size:12.5px; font-weight:600;
-  text-overflow:ellipsis; white-space:nowrap; }
+.players button { display:inline-flex; align-items:center; gap:6px; height:36px; padding:0 13px; border-radius:999px;
+  background:rgba(255,255,255,.08); color:rgba(255,255,255,.75); font-size:13px; font-weight:650; }
+.players button.active { background:#fff; color:#0a141c; }
+.players ha-icon { --mdc-icon-size:16px; }
+.mid { display:flex; flex-direction:column; gap:clamp(10px,1.6cqw,20px); min-width:0; }
+.meta { display:flex; flex-direction:column; min-width:0; }
+.title { font-size:clamp(30px,3.7cqw,52px); font-weight:800; letter-spacing:-.03em; line-height:1.06;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
+.artist { margin-top:8px; font-size:clamp(18px,1.95cqw,25px); font-weight:650; color:rgba(255,255,255,.9);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.album { margin-top:2px; font-size:clamp(15px,1.5cqw,18px); color:rgba(255,255,255,.58);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.context { display:inline-flex; align-self:flex-start; align-items:center; gap:6px; max-width:100%; height:30px;
+  margin-top:12px; padding:0 12px 0 9px; border-radius:999px; background:rgba(255,255,255,.08);
+  color:rgba(255,255,255,.78); font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden; }
 .context:empty { display:none; }
-.progress { position:relative; display:block; width:100%; height:50px; padding:0; border:0; background:transparent; color:inherit; }
+.context ha-icon { --mdc-icon-size:16px; color:var(--np-acc); flex:none; }
+.progress { position:relative; display:block; width:100%; height:46px; }
 .progress:active { transform:none; }
-.track { position:absolute; top:20px; right:0; left:0; height:6px; overflow:hidden; border-radius:99px; background:rgba(255,255,255,.22); }
-.fill { display:block; width:0; height:100%; border-radius:inherit; background:var(--np-grad); transition:width .2s linear; }
-.thumb { position:absolute; top:50%; left:0; width:18px; height:18px; border-radius:50%; background:#fff;
-  box-shadow:0 2px 8px rgba(0,0,0,.4); transform:translate(-50%,-50%); }
-.times { display:flex; justify-content:space-between; margin-top:30px; color:rgba(255,255,255,.7); font-size:13px;
-  font-variant-numeric:tabular-nums; }
-.transport,.actions { display:flex; align-items:center; justify-content:center; gap:18px; }
-button.icon { display:grid; flex:none; width:56px; height:56px; place-items:center; border:0; border-radius:50%;
-  background:rgba(255,255,255,.08); color:rgba(255,255,255,.88); }
-button.icon:disabled { opacity:.35; }
-button.icon ha-icon { --mdc-icon-size:28px; }
-button.play { width:84px; height:84px; background:#fff; color:#0b1b24; box-shadow:0 12px 30px rgba(0,0,0,.35); }
-button.play ha-icon { --mdc-icon-size:42px; }
-button.on { color:#0b1b24; background:#fff; }
-.actions { justify-content:center; gap:10px; }
-.actions button.icon { width:48px; height:48px; background:transparent; }
-.actions button.icon.on { background:rgba(255,255,255,.92); }
-.actions button.icon ha-icon { --mdc-icon-size:24px; }
-.volume-row { display:grid; grid-template-columns:48px minmax(0,1fr) 48px; align-items:center;
-  gap:12px; width:100%; min-height:56px; padding:4px; border-radius:999px; background:rgba(0,0,0,.22); }
-.volume-row button.icon { width:48px; height:48px; background:rgba(255,255,255,.08); }
-.volume-row button.icon ha-icon { --mdc-icon-size:24px; }
-.volume-range { width:100%; min-width:0; height:48px; margin:0; padding:0; accent-color:#f6b26b; touch-action:pan-y; }
-.queue { max-height:132px; overflow:auto; padding:10px 14px; border-radius:16px; background:rgba(0,0,0,.25); }
-.queue-title { padding:0 0 6px; color:rgba(255,255,255,.85); font-size:12px; font-weight:750; letter-spacing:.6px;
-  text-transform:uppercase; }
-.queue-row { overflow:hidden; padding:5px 0; color:rgba(255,255,255,.78); font-size:14px; text-overflow:ellipsis; white-space:nowrap; }
-.queue-row + .queue-row { border-top:1px solid rgba(255,255,255,.08); }
-.notice { min-height:0; color:#ffd0c7; font-size:13px; }
-@media (max-height:700px) {
-  .layout { padding:22px 26px; gap:12px 26px; }
-  .title { font-size:32px; }
-  .artist { font-size:19px; }
-  button.play { width:72px; height:72px; }
-  button.icon { width:50px; height:50px; }
-}
-@media (max-width:700px) {
-  :host { min-height:100vh; }
-  .shell { height:auto; min-height:100vh; max-height:none; border-radius:0; }
-  .layout { grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto auto;
-    align-content:center; gap:18px; min-height:100vh; padding:76px 20px 20px; }
-  .cover-area { grid-column:1; grid-row:1; }
-  .cover,.cover-empty,.lyrics-pane { width:min(68vw,320px); }
-  .lyric-line { font-size:15px; }
-  .lyric-line.active { font-size:19px; }
-  .side { grid-column:1; grid-row:2; gap:10px; padding:0; }
-  .bottom-controls { grid-column:1; grid-row:3; padding:0; }
-  .title { font-size:27px; text-align:center; }
-  .artist,.album { text-align:center; }
+.progress[hidden] { display:none; }
+.track { position:absolute; top:14px; left:0; right:0; height:6px; overflow:hidden; border-radius:99px;
+  background:rgba(255,255,255,.2); }
+.fill { display:block; width:0; height:100%; border-radius:inherit;
+  background:linear-gradient(90deg,var(--np-acc),var(--np-acc2)); transition:width .25s linear; }
+.thumb { position:absolute; top:17px; left:0; width:16px; height:16px; border-radius:50%; background:#fff;
+  transform:translate(-50%,-50%); box-shadow:0 0 0 5px rgba(255,255,255,.14),0 2px 8px rgba(0,0,0,.4); }
+.times { position:absolute; top:28px; left:0; right:0; display:flex; justify-content:space-between;
+  font-size:12.5px; font-weight:650; color:rgba(255,255,255,.62); font-variant-numeric:tabular-nums; }
+.transport { display:flex; align-items:center; justify-content:space-between; width:100%; padding:0 2px; }
+.btn { position:relative; display:grid; place-items:center; flex:none; border-radius:50%; color:rgba(255,255,255,.92); }
+.btn.sm { width:52px; height:52px; color:rgba(255,255,255,.62); }
+.btn.sm ha-icon { --mdc-icon-size:24px; }
+.btn.sm.on { color:var(--np-acc); }
+.btn.sm.on::after { content:''; position:absolute; bottom:6px; width:5px; height:5px; border-radius:50%; background:var(--np-acc); }
+.btn.md { width:clamp(56px,5.6cqw,70px); height:clamp(56px,5.6cqw,70px); background:rgba(255,255,255,.1); }
+.btn.md ha-icon { --mdc-icon-size:34px; }
+.btn.play { width:clamp(76px,7.4cqw,94px); height:clamp(76px,7.4cqw,94px); background:#fff; color:#0a141c;
+  box-shadow:0 18px 40px -10px rgba(0,0,0,.55),0 0 0 8px rgba(255,255,255,.08); }
+.btn.play ha-icon { --mdc-icon-size:46px; }
+.bottom { display:flex; align-items:center; gap:4px; min-height:60px; padding:6px; border-radius:999px;
+  background:rgba(255,255,255,.08); box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);
+  -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); }
+.bottom[hidden] { display:none; }
+.actions { display:flex; gap:2px; flex:none; }
+.actions:empty { display:none; }
+.actions .btn { width:48px; height:48px; color:rgba(255,255,255,.82); }
+.actions .btn ha-icon { --mdc-icon-size:23px; }
+.actions .btn.on { background:#fff; color:#0a141c; }
+.actions .btn.fav.on { background:transparent; color:var(--np-acc); }
+.actions:not(:empty) + .volume-row { margin-left:6px; padding-left:8px; border-left:1px solid rgba(255,255,255,.14); }
+.volume-row { display:flex; flex:1; align-items:center; gap:2px; min-width:0; }
+.volume-row:empty { display:none; }
+.volume-row .btn { width:44px; height:44px; color:rgba(255,255,255,.75); }
+.volume-row .btn ha-icon { --mdc-icon-size:22px; }
+.volume-range { -webkit-appearance:none; appearance:none; flex:1; min-width:40px; height:44px; margin:0 4px;
+  background:transparent; cursor:pointer; touch-action:pan-y; }
+.volume-range::-webkit-slider-runnable-track { height:6px; border-radius:99px;
+  background:linear-gradient(90deg,#fff 0 var(--v,0%),rgba(255,255,255,.2) var(--v,0%) 100%); }
+.volume-range::-webkit-slider-thumb { -webkit-appearance:none; width:20px; height:20px; margin-top:-7px;
+  border-radius:50%; background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.45); }
+.volume-range::-moz-range-track { height:6px; border-radius:99px; background:rgba(255,255,255,.2); }
+.volume-range::-moz-range-progress { height:6px; border-radius:99px; background:#fff; }
+.volume-range::-moz-range-thumb { width:20px; height:20px; border:0; border-radius:50%; background:#fff; }
+.vol-label { min-width:48px; padding-right:12px; text-align:right; font-size:13px; font-weight:750;
+  color:rgba(255,255,255,.8); font-variant-numeric:tabular-nums; }
+.notice { position:absolute; left:50%; bottom:16px; z-index:2; max-width:80%; transform:translateX(-50%);
+  padding:9px 16px; border-radius:14px; background:rgba(127,29,29,.85); color:#ffe4e0; font-size:13px; }
+.notice:empty { display:none; }
+
+/* phone, narrow column: stack everything */
+@container np (max-width:760px) {
+  .shell { height:auto; max-height:none; }
+  .layout { grid-template-columns:minmax(0,1fr); --cov:min(74cqw,380px); justify-items:center; height:auto;
+    gap:22px; padding:24px 20px 24px; }
+  .side { width:100%; height:auto; gap:18px; }
+  .top { justify-content:center; }
+  .meta { align-items:center; text-align:center; }
   .context { align-self:center; }
-  .transport { gap:12px; }
-  .actions { flex-wrap:wrap; }
+  .btn.sm { width:46px; height:46px; }
 }
 `;
 
@@ -165,7 +219,7 @@ export class KioskNowPlayingCard extends HTMLElement {
   _t() {
     const lang = taalVan(this._cfg.language, this._hass && this._hass.language);
     return Object.assign({}, lang.np, {
-      stil: lang.stil, shuffle: lang.shuffleTitel, repeat: lang.herhaalTitel, tracks: lang.nummers,
+      stil: lang.stil, shuffle: lang.shuffleTitel, repeat: lang.herhaalTitel, tracks: lang.nummers, track1: lang.nummer,
     });
   }
 
@@ -202,33 +256,33 @@ export class KioskNowPlayingCard extends HTMLElement {
     const height = Math.max(420, Math.min(780, Number(this._cfg.height) || 560));
     const t = this._t();
     this.shadowRoot.innerHTML = `<style>${NOW_PLAYING_STYLE}</style>
-      <section class="shell" style="--now-playing-height:${height}px">
+      <section class="shell" style="--now-playing-height:${height}px;${this._themeStyle()}">
         <div class="background" id="background"></div><div class="shade"></div>
-        <div class="status" id="status"></div>
         <div class="layout">
           <div class="cover-area" id="cover"></div>
           <div class="side">
-            <div class="players" id="players"></div>
-            <div class="title" id="title"></div>
-            <div class="artist" id="artist"></div>
-            <div class="album" id="album"></div>
-            <div class="context" id="context"></div>
-            <button class="progress" data-act="seek" id="progress" aria-label="${esc(t.seek)}">
-              <span class="track"><span class="fill" id="fill"></span><span class="thumb" id="thumb"></span></span>
-              <span class="times"><span id="position">0:00</span><span id="duration">0:00</span></span>
-            </button>
-            <div class="transport" id="transport"></div>
-            <div class="actions" id="actions"></div>
-            <div class="queue" id="queue" hidden></div>
-            <div class="notice" id="notice"></div>
-          </div>
-          <div class="bottom-controls">
-            <div class="volume-row" id="volume-row"></div>
+            <div class="top"><div class="status" id="status"></div><div class="players" id="players"></div></div>
+            <div class="mid">
+              <div class="meta">
+                <div class="title" id="title"></div>
+                <div class="artist" id="artist"></div>
+                <div class="album" id="album"></div>
+                <div class="context" id="context"></div>
+              </div>
+              <button class="progress" data-act="seek" id="progress" aria-label="${esc(t.seek)}">
+                <span class="track"><span class="fill" id="fill"></span></span><span class="thumb" id="thumb"></span>
+                <span class="times"><span id="position">0:00</span><span id="duration">0:00</span></span>
+              </button>
+              <div class="transport" id="transport"></div>
+            </div>
+            <div class="bottom" id="bottom"><div class="actions" id="actions"></div><div class="volume-row" id="volume-row"></div></div>
           </div>
         </div>
+        <div class="notice" id="notice"></div>
       </section>`;
     this.shadowRoot.addEventListener('click', (event) => this._click(event));
     this.shadowRoot.addEventListener('change', (event) => this._change(event));
+    this.shadowRoot.addEventListener('input', (event) => this._input(event));
     this._startProgressTimer();
     if (this._cfg.fill === true) {
       requestAnimationFrame(() => this._fillHeight());
@@ -352,11 +406,40 @@ export class KioskNowPlayingCard extends HTMLElement {
     this._updateProgress();
   }
 
+  // Accent colours from the same palettes as the browser card (theme: ocean...).
+  _themeStyle() {
+    const colors = THEME_COLORS[this._cfg.theme] || THEME_COLORS.sunset;
+    return `--np-acc:${colors.acc};--np-acc2:${colors.acc2};`;
+  }
+
+  _queueHtml(t) {
+    const head = `<div class="pane-head">${svg('mdi:playlist-music')}<span>${esc(t.queue)}${this._queueTotal
+      ? ` · ${this._queueTotal} ${esc(this._queueTotal === 1 ? t.track1 : t.tracks)}` : ''}</span>
+      <button class="close" data-act="queue" aria-label="${esc(t.queue)}">${svg('mdi:close')}</button></div>`;
+    if (this._queueBusy) return `<div class="pane">${head}<div class="pane-empty">${esc(t.queueLoading)}</div></div>`;
+    if (!this._queue.length) return `<div class="pane">${head}<div class="pane-empty">${esc(t.queueEmpty)}</div></div>`;
+    const rows = this._queue.map((item, index) => {
+      const media = item.media_item || {};
+      const image = VEILIG(media.image || item.image || '');
+      const name = media.name || item.name || item.title || item.media_title || t.track;
+      const artists = (media.artists || []).map((artist) => artist && artist.name).filter(Boolean).slice(0, 2).join(', ');
+      return `<div class="q-row${index === 0 ? ' now' : ''}">
+        ${image ? `<img alt="" src="${esc(image)}">` : `<span class="q-ph">${svg('mdi:music')}</span>`}
+        <div class="q-tx"><div class="q-label">${esc(index === 0 ? t.nowLabel : t.nextLabel)}</div>
+          <div class="q-name">${esc(name)}</div>${artists ? `<div class="q-art">${esc(artists)}</div>` : ''}</div></div>`;
+    }).join('');
+    const more = this._queueTotal > this._queue.length
+      ? `<div class="q-more">+ ${this._queueTotal - this._queue.length} ${esc(t.tracks)}</div>` : '';
+    return `<div class="pane">${head}<div class="q-list">${rows}${more}</div></div>`;
+  }
+
   _render(state, attributes, picture) {
     const entity = this._entity;
     const configured = this._players.find((player) => player.entity === entity) || {};
     const playing = state && ['playing', 'buffering'].includes(state.state);
+    const paused = state && state.state === 'paused';
     const t = this._t();
+    const $ = (id) => this.shadowRoot.getElementById(id);
     const title = attributes.media_title || t.stil;
     const artist = attributes.media_artist || '';
     const album = attributes.media_album_name || '';
@@ -366,60 +449,78 @@ export class KioskNowPlayingCard extends HTMLElement {
       return current && ['playing', 'buffering'].includes(current.state);
     });
     const provider = this._provider(attributes);
-    const status = this.shadowRoot.getElementById('status');
-    status.innerHTML = `${svg(playing ? 'mdi:play-circle' : 'mdi:pause-circle')}<span>${esc(playing ? t.playing : state && state.state === 'paused' ? t.paused : t.stopped)} · ${esc(playerName)}</span>`;
-    const cover = this.shadowRoot.getElementById('cover');
-    cover.innerHTML = this._lyricsVisible && this._lyricsAvailable
-      ? `<div class="lyrics-pane" id="lyrics-pane"><div class="lyrics-lines">${this._lyricsLines
-        .map((line, index) => `<div class="lyric-line${index === this._activeLyricIndex ? ' active' : ''}" data-lyric-index="${index}">${esc(line.text)}</div>`)
-        .join('')}</div></div>`
-      : picture ? `<img class="cover" src="${esc(picture)}" alt="${esc(t.coverOf)} ${esc(title)}">`
-        : `<div class="cover-empty">${svg('mdi:music')}</div>`;
-    this.shadowRoot.getElementById('background').style.backgroundImage = picture
-      ? `url("${picture.replace(/["\\\n\r]/g, '')}")` : '';
-    this.shadowRoot.getElementById('players').innerHTML = activePlayers.length > 1
+
+    const status = $('status');
+    status.classList.toggle('playing', !!playing);
+    status.innerHTML = `<span class="eq"><i></i><i></i><i></i></span>
+      <span class="st-label">${esc(playing ? t.playing : paused ? t.paused : t.stopped)}</span>
+      <span class="st-player">${svg('mdi:speaker')}<span>${esc(playerName)}</span></span>`;
+    $('players').innerHTML = activePlayers.length > 1
       ? activePlayers.map((player) => `<button class="${player.entity === entity ? 'active' : ''}"
           data-act="player" data-entity="${esc(player.entity)}">${svg('mdi:speaker')}<span>${esc(player.name || player.entity)}</span></button>`).join('')
       : '';
-    this.shadowRoot.getElementById('title').textContent = title;
-    this.shadowRoot.getElementById('artist').textContent = artist;
-    this.shadowRoot.getElementById('album').textContent = album;
-    this.shadowRoot.getElementById('context').textContent = `${provider} · ${playerName}`;
+
+    const cover = $('cover');
+    if (this._queueOpen) cover.innerHTML = this._queueHtml(t);
+    else if (this._lyricsVisible && this._lyricsAvailable) {
+      cover.innerHTML = `<div class="pane lyrics-pane" id="lyrics-pane"><div class="lyrics-lines">${this._lyricsLines
+        .map((line, index) => `<div class="lyric-line${index === this._activeLyricIndex ? ' active' : ''}" data-lyric-index="${index}">${esc(line.text)}</div>`)
+        .join('')}</div></div>`;
+    } else {
+      cover.innerHTML = picture ? `<img class="cover" src="${esc(picture)}" alt="${esc(t.coverOf)} ${esc(title)}">`
+        : `<div class="cover-empty">${svg('mdi:music')}</div>`;
+    }
+    $('background').style.backgroundImage = picture
+      ? `url("${picture.replace(/["\\\n\r]/g, '')}")` : '';
+
+    $('title').textContent = title;
+    $('artist').textContent = artist;
+    $('album').textContent = album && album !== title ? album : '';
+    const providerIcon = /spotify/i.test(provider) ? 'mdi:spotify'
+      : /youtube/i.test(provider) ? 'mdi:youtube' : /radio/i.test(provider) ? 'mdi:radio' : 'mdi:music-circle-outline';
+    $('context').innerHTML = provider ? `${svg(providerIcon)}<span>${esc(provider)}</span>` : '';
+
     const duration = Number(attributes.media_duration) || 0;
-    const progress = this.shadowRoot.getElementById('progress');
+    const progress = $('progress');
     progress.hidden = duration <= 0;
     progress.disabled = !this._supports(attributes, 2);
+
     const canPlayPause = playing ? this._supports(attributes, 1) : this._supports(attributes, 16384);
-    this.shadowRoot.getElementById('transport').innerHTML = `
-      ${this._supports(attributes, 16) ? `<button class="icon" data-act="previous" title="${esc(t.previous)}" aria-label="${esc(t.previous)}">${svg('mdi:skip-previous')}</button>` : ''}
-      ${canPlayPause ? `<button class="icon play" data-act="play-pause" title="${esc(playing ? t.pause : t.play)}" aria-label="${esc(playing ? t.pause : t.play)}">${svg(playing ? 'mdi:pause' : 'mdi:play')}</button>` : ''}
-      ${this._supports(attributes, 32) ? `<button class="icon" data-act="next" title="${esc(t.next)}" aria-label="${esc(t.next)}">${svg('mdi:skip-next')}</button>` : ''}`;
+    const button = (cls, act, label, icon) =>
+      `<button class="btn ${cls}" data-act="${act}" title="${esc(label)}" aria-label="${esc(label)}">${svg(icon)}</button>`;
+    const shuffle = this._supports(attributes, 32768)
+      ? button(`sm${attributes.shuffle ? ' on' : ''}`, 'shuffle', t.shuffle, 'mdi:shuffle-variant') : '<span class="btn sm"></span>';
+    const repeat = this._supports(attributes, 131072)
+      ? button(`sm${attributes.repeat && attributes.repeat !== 'off' ? ' on' : ''}`, 'repeat', t.repeat,
+        attributes.repeat === 'one' ? 'mdi:repeat-once' : 'mdi:repeat') : '<span class="btn sm"></span>';
+    $('transport').innerHTML = `${shuffle}
+      ${this._supports(attributes, 16) ? button('md', 'previous', t.previous, 'mdi:skip-previous') : ''}
+      ${canPlayPause ? button('play', 'play-pause', playing ? t.pause : t.play, playing ? 'mdi:pause' : 'mdi:play') : ''}
+      ${this._supports(attributes, 32) ? button('md', 'next', t.next, 'mdi:skip-next') : ''}
+      ${repeat}`;
+
     const favorite = this._queueContext || {};
-    const hasFavorite = !!favorite.favoriteAccount && !!favorite.itemId
-      && typeof favorite.favorite === 'boolean';
+    const hasFavorite = !!favorite.favoriteAccount && !!favorite.itemId && typeof favorite.favorite === 'boolean';
     const hasQueue = !!(attributes.active_queue && this._cfg.config_entry_id);
+    const favLabel = favorite.favorite ? t.favRemove : t.favAdd;
+    $('actions').innerHTML = [
+      hasFavorite ? button(`fav${favorite.favorite ? ' on' : ''}`, 'favorite', favLabel,
+        favorite.favorite ? 'mdi:heart' : 'mdi:heart-outline') : '',
+      hasQueue ? button(this._queueOpen ? 'on' : '', 'queue', t.queue, 'mdi:playlist-music') : '',
+      this._lyricsAvailable ? button(this._lyricsVisible ? 'on' : '', 'lyrics', t.lyrics, 'mdi:microphone-variant') : '',
+    ].join('');
+
     const volume = Number(attributes.volume_level);
-    const favLabel = esc(favorite.favorite ? t.favRemove : t.favAdd);
-    this.shadowRoot.getElementById('actions').innerHTML = `
-      ${hasFavorite ? `<button class="icon ${favorite.favorite ? 'on' : ''}" data-act="favorite" title="${favLabel}" aria-label="${favLabel}">${svg(favorite.favorite ? 'mdi:heart' : 'mdi:heart-outline')}</button>` : ''}
-      ${this._supports(attributes, 32768) ? `<button class="icon ${attributes.shuffle ? 'on' : ''}" data-act="shuffle" title="${esc(t.shuffle)}" aria-label="${esc(t.shuffle)}">${svg('mdi:shuffle')}</button>` : ''}
-      ${this._supports(attributes, 131072) ? `<button class="icon ${attributes.repeat && attributes.repeat !== 'off' ? 'on' : ''}" data-act="repeat" title="${esc(t.repeat)}" aria-label="${esc(t.repeat)}">${svg(attributes.repeat === 'one' ? 'mdi:repeat-once' : 'mdi:repeat')}</button>` : ''}
-      ${hasQueue ? `<button class="icon ${this._queueOpen ? 'on' : ''}" data-act="queue" title="${esc(t.queue)}" aria-label="${esc(t.queue)}">${svg('mdi:playlist-music')}</button>` : ''}
-      ${this._lyricsAvailable ? `<button class="icon ${this._lyricsVisible ? 'on' : ''}" data-act="lyrics" title="${esc(t.lyrics)}" aria-label="${esc(t.lyrics)}">${svg('mdi:menu')}</button>` : ''}`;
-    const volumeRow = this.shadowRoot.getElementById('volume-row');
     const hasVolume = this._supports(attributes, 4) && Number.isFinite(volume);
-    volumeRow.style.display = hasVolume ? 'grid' : 'none';
-    volumeRow.innerHTML = hasVolume ? `
-      <button class="icon" data-act="volume-down" title="${esc(t.volDown)}" aria-label="${esc(t.volDown)}">${svg('mdi:volume-minus')}</button>
-      <input class="volume-range" data-act="volume" type="range" min="0" max="1" step="0.01" value="${volume}" aria-label="Volume">
-      <button class="icon" data-act="volume-up" title="${esc(t.volUp)}" aria-label="${esc(t.volUp)}">${svg('mdi:volume-plus')}</button>` : '';
-    const queue = this.shadowRoot.getElementById('queue');
-    queue.hidden = !this._queueOpen;
-    queue.innerHTML = this._queueBusy ? `<div class="queue-title">${esc(t.queueLoading)}</div>`
-      : this._queueOpen ? `<div class="queue-title">${esc(t.queue)}${this._queueTotal ? ` · ${this._queueTotal} ${esc(t.tracks)}` : ''}</div>${this._queue.length
-        ? this._queue.map((item) => `<div class="queue-row">${esc(item.name || item.title || item.media_title || t.track)}</div>`).join('')
-        : `<div class="queue-row">${esc(t.queueEmpty)}</div>`}` : '';
-    this.shadowRoot.getElementById('notice').textContent = this._notice;
+    const percent = Math.round((hasVolume ? volume : 0) * 100);
+    $('volume-row').innerHTML = hasVolume ? `
+      ${button('', 'volume-down', t.volDown, percent === 0 ? 'mdi:volume-off' : 'mdi:volume-low')}
+      <input class="volume-range" data-act="volume" type="range" min="0" max="1" step="0.01" value="${volume}"
+        style="--v:${percent}%" aria-label="Volume">
+      ${button('', 'volume-up', t.volUp, 'mdi:volume-high')}
+      <span class="vol-label" id="vol-label">${percent}%</span>` : '';
+    $('bottom').hidden = !hasVolume && !$('actions').innerHTML;
+    $('notice').textContent = this._notice;
   }
 
   _time(seconds) {
@@ -656,13 +757,24 @@ export class KioskNowPlayingCard extends HTMLElement {
     } else if (target.dataset.act === 'favorite') {
       this._toggleFavorite();
     } else if (target.dataset.act === 'queue') {
-      if (this._queueOpen) { this._queueOpen = false; this._sync(); } else this._loadQueue();
+      if (this._queueOpen) { this._queueOpen = false; this._sync(); } else { this._lyricsVisible = false; this._loadQueue(); }
     } else if (target.dataset.act === 'lyrics') {
       this._lyricsVisible = !this._lyricsVisible;
+      if (this._lyricsVisible) this._queueOpen = false;
       this._activeLyricIndex = -1;
       this._signature = '';
       this._sync();
     }
+  }
+
+  // Move the slider fill and the label while dragging; the volume is sent on release.
+  _input(event) {
+    const range = event.target;
+    if (!range || !range.dataset || range.dataset.act !== 'volume') return;
+    const percent = Math.round(Number(range.value) * 100);
+    range.style.setProperty('--v', `${percent}%`);
+    const label = this.shadowRoot.getElementById('vol-label');
+    if (label) label.textContent = `${percent}%`;
   }
 
   _change(event) {

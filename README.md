@@ -128,6 +128,7 @@ links:
 | `spotify_entity` | none | Optional SpotifyPlus `media_player` whose Spotify history seeds the recommendations when the selected music source has no `spotify_entity`. |
 | `discover_hidden_rows` | `true` | Also show the rows Music Assistant hides by default (random, forgotten, most played, ...). `false` keeps only the default rows. YAML only. |
 | `kiosk_theme` | `true` | Kiosk styling with large touch targets. Set to `false` to follow the plain Home Assistant theme. |
+| `theme` | `sunset` | Colour theme of the kiosk styling: `sunset` (peach & pink), `spotify` (green on black), `ocean` (cyan & indigo), `aurora` (mint & lavender), `neon` (pink & violet), `ember` (amber & red), `graphite` (monochrome) or `daylight` (light). |
 | `language` | HA language | `en`, `fr` or `nl`. |
 | `volume_max` | `100` | Maximum volume (%); also the end of the slider. |
 | `volume_start` | none | When playback starts while the volume is above `volume_max`, drop back to this value (%). |
@@ -229,6 +230,7 @@ favorite_accounts:
 | `language` | HA language | `en`, `fr` or `nl`. |
 | `players` | all Music Assistant players | Players to follow. The card shows the one that is playing (or the most recently paused). When several play at once, buttons let you choose. |
 | `volume_step` | `5` | Volume button step (%). |
+| `theme` | `sunset` | Accent colours, same names as the browser card `theme`. |
 | `provider_names` | none | Display names for Music Assistant provider instance ids (`spotify--xxxx`). The instance id is shown in Music Assistant under *Settings > Music providers*. |
 | `favorite_accounts` | none | Maps a provider instance id to a SpotifyPlus `media_player` to show a favourite (heart) button for the current track. |
 

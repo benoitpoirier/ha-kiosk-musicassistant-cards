@@ -38,6 +38,7 @@ SEED_POOL = 20
 SEED_COUNT = 6
 SEED_ROWS = 3
 SIMILAR_LIMIT = 25
+SIMILAR_TIMEOUT = 15
 
 GET_TOP_PICKS_SCHEMA = vol.Schema(
     {
@@ -297,13 +298,22 @@ async def _async_similar(mass: Any, user: str | None, seed: dict[str, Any]) -> l
         "allow_lookup": True,
     }
     try:
-        result = await _send(mass, "music/tracks/similar_tracks", user, **kwargs)
+        result = await asyncio.wait_for(
+            _send(mass, "music/tracks/similar_tracks", user, **kwargs), SIMILAR_TIMEOUT
+        )
+    except TimeoutError:
+        # A slow provider must not hold the whole feed back; its answer lands
+        # in Music Assistant's cache for the next refresh anyway.
+        _LOGGER.debug("Similar tracks for %s timed out", seed)
+        return []
     except Exception as err:  # noqa: BLE001
         if not user:
             _LOGGER.debug("Similar tracks for %s failed: %s", seed, err)
             return []
         try:
-            result = await mass.send_command("music/tracks/similar_tracks", **kwargs)
+            result = await asyncio.wait_for(
+                mass.send_command("music/tracks/similar_tracks", **kwargs), SIMILAR_TIMEOUT
+            )
         except Exception as err2:  # noqa: BLE001
             _LOGGER.debug("Similar tracks for %s failed: %s", seed, err2)
             return []

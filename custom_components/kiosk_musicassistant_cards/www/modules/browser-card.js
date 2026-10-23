@@ -2,6 +2,7 @@ import {
   BIB_MAX, BIB_TTL, GROOT, KLEIN, KORT, RIJEN, SOORTEN, SOORT_VAN,
   SPOTIFY_URI, SPEELT, VEILIG, categoriesParDefaut, esc, mmss, svg, taalVan,
 } from './shared.js';
+import { KIOSK_CSS, KIOSK_THEMES } from './kiosk-theme.js';
 
 const DOMAIN = 'kiosk_musicassistant_cards';
 
@@ -450,6 +451,8 @@ export class MusicAssistantTouchCard extends HTMLElement {
     this._restoreSource();
     // keyboard: true  -> eigen schermtoetsenbord (Nest Hub, kiosk)
     // keyboard: false -> gewoon tekstveld met het toetsenbord van het apparaat
+    const thema = KIOSK_THEMES.includes(config.theme) ? config.theme : 'sunset';
+    if (this.dataset.kt !== thema) this.dataset.kt = thema;
     this._schermtoetsen = config.keyboard !== false;
     this._kbd = this._schermtoetsen;
     this._zones = null;
@@ -471,49 +474,61 @@ export class MusicAssistantTouchCard extends HTMLElement {
 
   _ontdekSleutel() { return `${this._cfg.config_entry_id}|${this._user() || ''}|${this._ontdekBron()}`; }
 
+  // Fetches the feed in parts: Music Assistant's rows answer in a blink, the
+  // similar-track lookups can take half a minute on a cold cache. Each part is
+  // drawn as soon as it lands, so the tab never sits empty.
   _ontdekHaal(force) {
     if (!this._hass || !this._cfg || !this._discover) return Promise.resolve();
     const sleutel = this._ontdekSleutel();
     const c = this._ontdek;
-    if (!force && c && c.sleutel === sleutel && Date.now() - c.tijd < BIB_TTL) {
-      // Already fetched, but the view may still show the placeholders (the
-      // card was rebuilt or re-attached while the answer was on its way).
-      if (this._mode === 'ontdek' && this._ontdekGetekend !== c) this._tekenRechts();
+    if (!force && c && c.sleutel === sleutel && (c.wacht.size || Date.now() - c.tijd < BIB_TTL)) {
+      // The view may still show an older state (the card was rebuilt or
+      // re-attached while an answer was on its way).
+      if (this._mode === 'ontdek' && this._ontdekGetekend !== `${sleutel}|${c.versie}`) this._tekenRechts();
       return Promise.resolve();
     }
-    if (this._ontdekBezig && this._ontdekBezig.sleutel === sleutel) return this._ontdekBezig.p;
-    const data = {
-      config_entry_id: this._cfg.config_entry_id,
-      row_limit: 20,
-      include_hidden: this._cfg.discover_hidden_rows !== false,
-      source: this._ontdekBron(),
-    };
-    if (this._user()) data.username = this._user();
-    const bron = this._sourceCfg();
-    const spotify = (bron && bron.spotify_entity) || this._cfg.spotify_entity;
-    if (spotify && data.source !== 'music_assistant') data.spotify_entity = spotify;
-    const p = this._ws({
-      type: 'call_service', domain: DOMAIN, service: 'get_recommendations',
-      service_data: data, return_response: true,
-    }).then((r) => {
-      const rows = ((r && r.response && r.response.rows) || []).slice()
-        // Near-empty rows (a single "recently played" item) go last.
+    const bron = this._ontdekBron();
+    const delen = bron === 'mixed' ? ['similar', 'music_assistant'] : [bron];
+    const nieuw = { sleutel, tijd: Date.now(), delen: {}, wacht: new Set(delen), rows: [], versie: 0 };
+    this._ontdek = nieuw;
+    const bronCfg = this._sourceCfg();
+    const spotify = (bronCfg && bronCfg.spotify_entity) || this._cfg.spotify_entity;
+    const samenstellen = () => {
+      // Near-empty rows (a single "recently played" item) go last.
+      const ma = (nieuw.delen.music_assistant || []).slice()
         .sort((a, b) => (a.items.length < 3) - (b.items.length < 3));
-      if (sleutel !== this._ontdekSleutel()) return;
-      for (const row of rows) this._onthoudBeeld(row.items);
-      this._ontdek = { sleutel, tijd: Date.now(), rows };
-    }).catch((error) => {
-      if (sleutel !== this._ontdekSleutel()) return;
-      this._ontdek = { sleutel, tijd: Date.now(), rows: [], fout: true };
-      this._fout(error);
-    }).finally(() => {
-      if (this._ontdekBezig && this._ontdekBezig.p === p) this._ontdekBezig = null;
-      if (this._mode === 'ontdek') this._tekenRechts();
-    });
-    this._ontdekBezig = { sleutel, p };
-    return p;
+      nieuw.rows = [...(nieuw.delen.similar || []), ...ma];
+      nieuw.versie++;
+      if (this._ontdek === nieuw && this._mode === 'ontdek') this._tekenRechts();
+    };
+    return Promise.all(delen.map((deel) => {
+      const data = {
+        config_entry_id: this._cfg.config_entry_id,
+        row_limit: 20,
+        include_hidden: this._cfg.discover_hidden_rows !== false,
+        source: deel,
+      };
+      if (this._user()) data.username = this._user();
+      if (spotify && deel !== 'music_assistant') data.spotify_entity = spotify;
+      return this._ws({
+        type: 'call_service', domain: DOMAIN, service: 'get_recommendations',
+        service_data: data, return_response: true,
+      }).then((r) => {
+        let rows = (r && r.response && r.response.rows) || [];
+        // In mixed mode the Music Assistant rows come from their own request.
+        if (bron === 'mixed' && deel === 'similar') rows = rows.filter((row) => row.source !== 'music_assistant');
+        for (const row of rows) this._onthoudBeeld(row.items);
+        nieuw.delen[deel] = rows;
+      }).catch((error) => {
+        nieuw.delen[deel] = [];
+        if (this._ontdek === nieuw) this._fout(error);
+      }).finally(() => {
+        nieuw.wacht.delete(deel);
+        if (!nieuw.wacht.size) nieuw.tijd = Date.now();
+        samenstellen();
+      });
+    }));
   }
-
   _rijNaam(row) {
     const t = this._taal();
     if (row.translation_key === 'for_you') return t.voorJou;
@@ -1157,7 +1172,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
     const vul = this._cfg.fill === true;
     const h = (this._cfg.height || 556) + 'px';
     const thema = this._cfg.kiosk_theme === false
-      ? '' : `<link rel="stylesheet" href="/${DOMAIN}/kiosk-theme.css">`;
+      ? '' : `<style>${KIOSK_CSS}</style>`;
     this.shadowRoot.innerHTML = `<style>${STYLE}</style>
       ${thema}
       <div class="wrap" style="--mc-h:${h};--zn:${this._zoneLijst().length}">
@@ -1532,10 +1547,16 @@ export class MusicAssistantTouchCard extends HTMLElement {
   _tekenRechts() {
     const el = this.shadowRoot.getElementById('right');
     if (!el) return;
+    // Redrawing the same view (a part of the feed arrived) keeps the scroll position.
+    const weergave = `${this._mode}|${this._cat}`;
+    const vorig = el.querySelector('.vlak');
+    const top = vorig && this._weergave === weergave ? vorig.scrollTop : 0;
+    this._weergave = weergave;
     if (this._mode === 'ontdek' && this._discover) el.innerHTML = this._ontdekHtml();
     else if (this._mode === 'home' || this._mode === 'ontdek') el.innerHTML = this._homeHtml();
     else if (this._mode === 'detail') el.innerHTML = this._detailHtml();
     else el.innerHTML = this._zoekHtml();
+    if (top) { const nu = el.querySelector('.vlak'); if (nu) nu.scrollTop = top; }
     requestAnimationFrame(() => this._toonRail());
   }
 
@@ -1591,11 +1612,15 @@ export class MusicAssistantTouchCard extends HTMLElement {
     const t = this._taal();
     const chips = this._tabsHtml();
     const c = this._ontdek && this._ontdek.sleutel === this._ontdekSleutel() ? this._ontdek : null;
-    this._ontdekGetekend = c;
-    if (!c) {
-      const skelet = [0, 1].map(() => `<section class="ok-rij"><div class="ok-kop"><div class="ok-titel skelet-txt"></div></div>${this._skeletHtml(8, true)}</section>`).join('');
-      return chips + this._scrollbox(`<div class="ontdek vlak"><div class="held skelet"></div>${skelet}</div>`);
+    this._ontdekGetekend = c ? `${c.sleutel}|${c.versie}` : null;
+    const skeletRij = (titel) => `<section class="ok-rij"><div class="ok-kop">${titel
+      ? `<span class="ok-ic">${svg('ontdek')}</span><div class="ok-titel">${esc(titel)}<small class="laden">${esc(t.zoektVoorJou)}</small></div>`
+      : '<div class="ok-titel skelet-txt"></div>'}</div>${this._skeletHtml(8, true)}</section>`;
+    if (!c || (!c.rows.length && c.wacht.size)) {
+      return chips + this._scrollbox(`<div class="ontdek vlak"><div class="held skelet"></div>${skeletRij(c && c.wacht.has('similar') ? t.voorJou : '')}${skeletRij('')}</div>`);
     }
+    // The recommendations are still on their way: hold their place on top.
+    const wachtOpSimilar = c.wacht.has('similar');
     if (!c.rows.length) {
       return chips + `<div class="leeg leeg-groot">${svg('ontdek')}<div>${esc(t.ontdekLeeg)}</div>
         <button class="knop" data-act="okvernieuw">${svg('vernieuw')} ${esc(t.opnieuw)}</button></div>`;
@@ -1615,7 +1640,8 @@ export class MusicAssistantTouchCard extends HTMLElement {
         if (i >= 0) { heldR = r; heldI = i; }
       }
     }
-    if (heldR >= 0) {
+    if (wachtOpSimilar) held = '<div class="held skelet"></div>';
+    else if (heldR >= 0) {
       const it = c.rows[heldR].items[heldI];
       const beeld = esc(GROOT(VEILIG(it.image)));
       held = `<div class="held">
@@ -1652,7 +1678,8 @@ export class MusicAssistantTouchCard extends HTMLElement {
         </div>
         <div class="carrousel" id="okrij${r}">${kaarten}</div></section>`;
     }).join('');
-    return chips + this._scrollbox(`<div class="ontdek vlak">${held}${rijen}</div>`);
+    const voorlopig = wachtOpSimilar ? skeletRij(t.voorJou) : '';
+    return chips + this._scrollbox(`<div class="ontdek vlak">${held}${voorlopig}${rijen}</div>`);
   }
 
   // The tabs: discover first, then the categories, the search button last.
