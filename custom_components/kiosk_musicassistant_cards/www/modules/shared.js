@@ -99,7 +99,7 @@ export const TAAL = {
       favAdd: 'Add to favourites', favRemove: 'Remove from favourites',
       queue: 'Queue', lyrics: 'Lyrics', volDown: 'Volume down', volUp: 'Volume up',
       queueLoading: 'Loading queue…', queueEmpty: 'Queue empty or unavailable',
-      track: 'Track', external: 'External source', nowLabel: 'Now playing', nextLabel: 'Up next',
+      track: 'Track', external: 'External source', nowLabel: 'Now playing', nextLabel: 'Up next', remove: 'Remove from queue',
     },
     ed: {
       algemeen: 'General', zones: 'Speakers', sources: 'Music sources', cats: 'Categories', links: 'Navigation buttons',
@@ -184,7 +184,7 @@ export const TAAL = {
       favAdd: 'Toevoegen aan favorieten', favRemove: 'Verwijderen uit favorieten',
       queue: 'Wachtrij', lyrics: 'Songtekst', volDown: 'Zachter', volUp: 'Harder',
       queueLoading: 'Wachtrij ophalen…', queueEmpty: 'Wachtrij leeg of niet beschikbaar',
-      track: 'Nummer', external: 'Externe bron', nowLabel: 'Speelt nu', nextLabel: 'Hierna',
+      track: 'Nummer', external: 'Externe bron', nowLabel: 'Speelt nu', nextLabel: 'Hierna', remove: 'Uit wachtrij verwijderen',
     },
     ed: {
       algemeen: 'Algemeen', zones: 'Speakers', sources: 'Muziekbronnen', cats: 'Categorieen', links: 'Navigatieknoppen',
@@ -272,7 +272,7 @@ export const TAAL = {
       queue: 'File d’attente', lyrics: 'Paroles', volDown: 'Baisser le volume',
       volUp: 'Augmenter le volume', queueLoading: 'Chargement de la file…',
       queueEmpty: 'File vide ou indisponible', track: 'Titre', external: 'Source externe',
-      nowLabel: 'En cours', nextLabel: 'À suivre',
+      nowLabel: 'En cours', nextLabel: 'À suivre', remove: 'Retirer de la file',
     },
     ed: {
       algemeen: 'Général', zones: 'Lecteurs', sources: 'Sources musicales', cats: 'Catégories',

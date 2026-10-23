@@ -125,3 +125,16 @@ play_now:
     username:
       selector:
         text:
+
+remove_queue_item:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          integration: music_assistant
+          domain: media_player
+    queue_item_id:
+      required: true
+      selector:
+        text:

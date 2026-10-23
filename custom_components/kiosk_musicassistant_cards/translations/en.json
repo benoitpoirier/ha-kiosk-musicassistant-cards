@@ -131,6 +131,20 @@
           "description": "Optional Music Assistant user to play as."
         }
       }
+    },
+    "remove_queue_item": {
+      "name": "Remove from queue",
+      "description": "Remove one track from the active queue of a Music Assistant player.",
+      "fields": {
+        "entity_id": {
+          "name": "Player",
+          "description": "Music Assistant player."
+        },
+        "queue_item_id": {
+          "name": "Queue item",
+          "description": "queue_item_id returned by get_queue_items."
+        }
+      }
     }
   }
 }

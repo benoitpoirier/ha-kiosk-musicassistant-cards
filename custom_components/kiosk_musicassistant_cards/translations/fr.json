@@ -131,6 +131,20 @@
           "description": "Utilisateur Music Assistant facultatif pour la lecture."
         }
       }
+    },
+    "remove_queue_item": {
+      "name": "Retirer de la file",
+      "description": "Retire un titre de la file d’attente active d’un lecteur Music Assistant.",
+      "fields": {
+        "entity_id": {
+          "name": "Lecteur",
+          "description": "Lecteur Music Assistant."
+        },
+        "queue_item_id": {
+          "name": "Élément de la file",
+          "description": "queue_item_id retourné par get_queue_items."
+        }
+      }
     }
   }
 }

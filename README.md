@@ -320,6 +320,16 @@ data:
 ```
 
 Plays the first track at once in a new queue, then appends the other tracks in the background (Music Assistant resolves every track of a `play_media` call before starting, which takes a long time for a long list). Tracks that cannot be played are skipped (the first playable one starts). Calls for the same player run one after the other and a newer list stops the background append of the previous one, so tapping several tracks in a row always ends with the last one and its list.
+### `kiosk_musicassistant_cards.remove_queue_item`
+
+```yaml
+action: kiosk_musicassistant_cards.remove_queue_item
+data:
+  entity_id: media_player.living_room
+  queue_item_id: <queue_item_id from get_queue_items>
+```
+
+Removes one track from the player's active queue. The now-playing queue panel shows a remove (×) button on every track except the one playing.
 ## Finding the Music Assistant `config_entry_id`
 
 In the card editor, pick Music Assistant from the drop-down. In YAML, open **Settings > Devices & services > Music Assistant**; the id is the last part of the URL of the integration entry, or use the drop-down of the `config_entry_id` field in **Developer tools > Actions**.

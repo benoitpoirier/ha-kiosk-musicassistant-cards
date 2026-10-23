@@ -56,13 +56,21 @@ ha-icon { pointer-events:none; }
   background:rgba(255,255,255,.1); }
 .pane-head .close ha-icon { color:#fff; }
 .q-list { flex:1; overflow:auto; scrollbar-width:none; padding:0 12px 12px; overscroll-behavior:contain; }
-.q-row { display:grid; grid-template-columns:56px minmax(0,1fr) auto; gap:14px; align-items:center;
+.q-row { display:grid; grid-template-columns:56px minmax(0,1fr) auto 40px; gap:12px; align-items:center;
+  transition:opacity .2s ease, transform .2s ease, max-height .25s ease .15s, padding .25s ease .15s; max-height:120px; overflow:hidden;
   padding:10px; border-radius:16px; }
 .q-row.now { background:rgba(255,255,255,.09); }
 .q-row img,.q-ph { width:56px; height:56px; border-radius:10px; object-fit:cover; }
 .q-row.played { opacity:.5; }
 .q-dur { font-size:13px; color:rgba(255,255,255,.55); font-variant-numeric:tabular-nums; padding-right:4px; }
 .q-more[hidden] { display:none; }
+.q-del,.q-del-ph { width:40px; height:40px; }
+.q-del { display:grid; place-items:center; border-radius:50%; color:rgba(255,255,255,.55);
+  background:rgba(255,255,255,.06); }
+.q-del ha-icon { --mdc-icon-size:20px; }
+.q-del:active { background:rgba(239,68,68,.35); color:#fff; }
+@media (hover:hover) { .q-del { opacity:0; } .q-row:hover .q-del { opacity:1; } .q-del:hover { color:#fff; background:rgba(239,68,68,.35); } }
+.q-row.removing { opacity:0; transform:translateX(24px); max-height:0; padding-top:0; padding-bottom:0; pointer-events:none; }
 .q-ph { display:grid; place-items:center; background:rgba(255,255,255,.08); color:rgba(255,255,255,.5); }
 .q-tx { min-width:0; }
 .q-label { font-size:11px; font-weight:800; letter-spacing:.8px; text-transform:uppercase; color:var(--np-acc); }
@@ -277,6 +285,16 @@ export class KioskNowPlayingCard extends HTMLElement {
         <div class="notice" id="notice"></div>
       </section>`;
     this.shadowRoot.addEventListener('click', (event) => this._click(event));
+    this.shadowRoot.addEventListener('error', (event) => {
+      const img = event.target;
+      if (!img || !img.classList || !img.classList.contains('cover')) return;
+      const cover = this.shadowRoot.getElementById('cover');
+      if (!cover || cover._retried === cover._key) return;
+      cover._retried = cover._key;
+      cover._key = null;
+      this._signature = '';
+      this._sync();
+    }, true);
     this.shadowRoot.addEventListener('scroll', (event) => {
       if (event.target && event.target.id === 'q-list') this._queueScroll();
     }, true);
@@ -391,7 +409,7 @@ export class KioskNowPlayingCard extends HTMLElement {
       this._activeLyricIndex = -1;
       if (queueContextKey) this._loadQueueContext(entity, queueContextKey);
       // A new track: reopen the list on it.
-      if (this._queueOpen && queueContextKey) Promise.resolve().then(() => this._loadQueue());
+      if (this._queueOpen && queueContextKey) Promise.resolve().then(() => { if (this._queueOpen) this._loadQueue(); });
     }
     const picture = VEILIG(attributes.entity_picture_local || attributes.entity_picture || '');
     const signature = [entity, state && state.state, attributes.media_title, attributes.media_artist,
@@ -435,7 +453,9 @@ export class KioskNowPlayingCard extends HTMLElement {
       ${image ? `<img alt="" loading="lazy" src="${esc(image)}">` : `<span class="q-ph">${svg('mdi:music')}</span>`}
       <div class="q-tx">${current ? `<div class="q-label">${esc(t.nowLabel)}</div>` : ''}
         <div class="q-name">${esc(item.name || t.track)}</div>${item.artist ? `<div class="q-art">${esc(item.artist)}</div>` : ''}</div>
-      <span class="q-dur">${item.duration ? this._time(item.duration) : ''}</span></div>`;
+      <span class="q-dur">${item.duration ? this._time(item.duration) : ''}</span>
+      ${current || !item.queue_item_id ? '<span class="q-del-ph"></span>' : `<button class="q-del" data-act="q-del"
+        data-id="${esc(item.queue_item_id)}" title="${esc(t.remove)}" aria-label="${esc(t.remove)} ${esc(item.name || '')}">${svg('mdi:close')}</button>`}</div>`;
   }
 
   _queueHtml(t) {
@@ -504,6 +524,37 @@ export class KioskNowPlayingCard extends HTMLElement {
     const nearTop = list.scrollTop < 300;
     if (nearBottom && qs.start + qs.items.length < qs.total) this._queueMore(1);
     else if (nearTop && qs.start > 0) this._queueMore(-1);
+  }
+
+  // Removes a row at once (it slides out) and asks Music Assistant to drop the
+  // item; on failure the row comes back and the error is shown.
+  async _removeQueueItem(button) {
+    const qs = this._qs;
+    const row = button.closest('.q-row');
+    const id = button.dataset.id;
+    if (!qs || !row || !id || row.classList.contains('removing')) return;
+    row.classList.add('removing');
+    try {
+      await this._hass.callService(DOMAIN, 'remove_queue_item', { entity_id: this._entity, queue_item_id: id });
+    } catch (error) {
+      row.classList.remove('removing');
+      this._notice = error && error.message ? error.message : String(error);
+      this._sync();
+      return;
+    }
+    if (this._qs !== qs) return;
+    const position = qs.items.findIndex((item) => item.queue_item_id === id);
+    if (position >= 0) {
+      const removed = qs.items[position].index;
+      qs.items.splice(position, 1);
+      for (const item of qs.items) if (item.index > removed) item.index -= 1;
+      if (qs.current != null && removed < qs.current) qs.current -= 1;
+      qs.total = Math.max(0, qs.total - 1);
+    }
+    setTimeout(() => row.remove(), 450);
+    const head = this.shadowRoot.getElementById('q-head');
+    const t = this._t();
+    if (head) head.textContent = `${t.queue}${qs.total ? ` · ${qs.total} ${qs.total === 1 ? t.track1 : t.tracks}` : ''}`;
   }
 
   async _queueMore(direction) {
@@ -867,8 +918,16 @@ export class KioskNowPlayingCard extends HTMLElement {
       });
     } else if (target.dataset.act === 'favorite') {
       this._toggleFavorite();
+    } else if (target.dataset.act === 'q-del') {
+      this._removeQueueItem(target);
     } else if (target.dataset.act === 'queue') {
-      if (this._queueOpen) { this._queueOpen = false; this._sync(); } else { this._lyricsVisible = false; this._loadQueue(); }
+      if (this._queueOpen) {
+        this._queueOpen = false;
+        const cover = this.shadowRoot.getElementById('cover');
+        if (cover) cover._key = null;
+        this._signature = '';
+        this._sync();
+      } else { this._lyricsVisible = false; this._loadQueue(); }
     } else if (target.dataset.act === 'lyrics') {
       this._lyricsVisible = !this._lyricsVisible;
       if (this._lyricsVisible) this._queueOpen = false;

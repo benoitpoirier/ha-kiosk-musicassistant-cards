@@ -237,3 +237,28 @@ async def async_play_now(call: ServiceCall) -> None:
                     _LOGGER.debug("Could not remove the previous track from %s: %s", queue_id, err)
                 else:
                     await asyncio.sleep(1)
+
+# ---------- remove a track from the queue ----------
+REMOVE_QUEUE_ITEM_SCHEMA = vol.Schema(
+    {
+        vol.Required("entity_id"): cv.entity_id,
+        vol.Required("queue_item_id"): cv.string,
+    }
+)
+
+
+async def async_remove_queue_item(call: ServiceCall) -> None:
+    """Remove one item from the active queue of a Music Assistant player."""
+    hass = call.hass
+    entity_id = call.data["entity_id"]
+    entry = er.async_get(hass).async_get(entity_id)
+    if entry is None or not entry.config_entry_id:
+        raise HomeAssistantError(f"{entity_id} is not a Music Assistant player")
+    mass = get_music_assistant_client(hass, entry.config_entry_id)
+    state = hass.states.get(entity_id)
+    queue_id = state.attributes.get("active_queue") if state else None
+    if not queue_id:
+        raise HomeAssistantError(f"{entity_id} has no active queue")
+    await mass.send_command(
+        "player_queues/delete_item", queue_id=queue_id, item_id_or_index=call.data["queue_item_id"]
+    )

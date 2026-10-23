@@ -19,9 +19,11 @@ from .queue import (
     GET_QUEUE_ITEMS_SCHEMA,
     PLAY_NOW_SCHEMA,
     PLAY_TRACKS_SCHEMA,
+    REMOVE_QUEUE_ITEM_SCHEMA,
     async_get_queue_items,
     async_play_now,
     async_play_tracks,
+    async_remove_queue_item,
 )
 from .recommendations import (
     GET_RECOMMENDATIONS_SCHEMA,
@@ -40,6 +42,7 @@ SERVICE_GET_RECOMMENDATIONS = "get_recommendations"
 SERVICE_GET_QUEUE_ITEMS = "get_queue_items"
 SERVICE_PLAY_TRACKS = "play_tracks"
 SERVICE_PLAY_NOW = "play_now"
+SERVICE_REMOVE_QUEUE_ITEM = "remove_queue_item"
 
 
 async def _async_get_track_lyrics(call: ServiceCall) -> dict[str, str | None]:
@@ -92,6 +95,9 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         DOMAIN, SERVICE_PLAY_TRACKS, async_play_tracks, schema=PLAY_TRACKS_SCHEMA
     )
     hass.services.async_register(DOMAIN, SERVICE_PLAY_NOW, async_play_now, schema=PLAY_NOW_SCHEMA)
+    hass.services.async_register(
+        DOMAIN, SERVICE_REMOVE_QUEUE_ITEM, async_remove_queue_item, schema=REMOVE_QUEUE_ITEM_SCHEMA
+    )
 
     async def _keep_warm(_now) -> None:
         async_keep_warm(hass)
