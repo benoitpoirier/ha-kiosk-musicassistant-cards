@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import voluptuous as vol
@@ -11,6 +12,8 @@ from homeassistant.core import ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from music_assistant_models.queue_item import QueueItem
+
+_LOGGER = logging.getLogger(__name__)
 
 PAGE_SIZE = 25
 MAX_PAGE_SIZE = 100
@@ -84,3 +87,48 @@ async def async_get_queue_items(call: ServiceCall) -> dict[str, Any]:
         "offset": offset,
         "items": items,
     }
+
+# ---------- play a list of tracks ----------
+# Music Assistant resolves every uri of a play_media call before it starts, so
+# a list of 100 tracks can take a minute. The tapped track is started alone
+# (replace: it plays at once, at the top of a new queue); the rest of the list
+# is then appended by Home Assistant in the background - a handful first so
+# "next" works right away. The kiosk card closing does not stop that.
+FIRST_BATCH = 5
+
+PLAY_TRACKS_SCHEMA = vol.Schema(
+    {
+        vol.Required("entity_id"): cv.entity_id,
+        vol.Required("uris"): vol.All(cv.ensure_list, [cv.string], vol.Length(min=1, max=500)),
+        vol.Optional("username"): cv.string,
+    }
+)
+
+
+async def async_play_tracks(call: ServiceCall) -> None:
+    """Play the first uri now, then queue the others after it."""
+    hass = call.hass
+    uris = call.data["uris"]
+    target = {"entity_id": call.data["entity_id"]}
+    extra = {"username": call.data["username"]} if call.data.get("username") else {}
+
+    async def play(media_id: str | list[str], enqueue: str) -> None:
+        await hass.services.async_call(
+            "music_assistant", "play_media",
+            {"media_id": media_id, "enqueue": enqueue, **extra}, target=target, blocking=True,
+        )
+
+    await play(uris[0], "replace")
+    rest = uris[1:]
+    if not rest:
+        return
+
+    async def append() -> None:
+        try:
+            for batch in (rest[:FIRST_BATCH], rest[FIRST_BATCH:]):
+                if batch:
+                    await play(batch, "add")
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("Could not queue the rest of the list: %s", err)
+
+    hass.async_create_background_task(append(), "kiosk_musicassistant_cards queue tracks")

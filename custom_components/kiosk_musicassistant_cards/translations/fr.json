@@ -95,6 +95,24 @@
           "description": "Nombre d’éléments retournés."
         }
       }
+    },
+    "play_tracks": {
+      "name": "Lire des titres",
+      "description": "Lit le premier titre tout de suite (nouvelle file), puis ajoute les autres en arrière-plan.",
+      "fields": {
+        "entity_id": {
+          "name": "Lecteur",
+          "description": "Lecteur Music Assistant."
+        },
+        "uris": {
+          "name": "Titres",
+          "description": "URI Music Assistant ; le premier est lu immédiatement."
+        },
+        "username": {
+          "name": "Utilisateur Music Assistant",
+          "description": "Utilisateur Music Assistant facultatif pour la lecture."
+        }
+      }
     }
   }
 }

@@ -295,6 +295,19 @@ response_variable: queue
 
 Returns `queue_id`, `current_index`, `total`, `offset` and `items` (`index`, `queue_item_id`, `name`, `artist`, `image`, `duration`). The now-playing card uses it for its queue panel: it opens on the current track with two pages loaded and fetches 25 more items whenever the list is scrolled near either end.
 
+### `kiosk_musicassistant_cards.play_tracks`
+
+```yaml
+action: kiosk_musicassistant_cards.play_tracks
+data:
+  entity_id: media_player.living_room
+  uris:
+    - library://track/12
+    - library://track/34
+  username: alice   # optional
+```
+
+Plays the first track at once in a new queue, then appends the other tracks in the background (Music Assistant resolves every track of a `play_media` call before starting, which takes a long time for a long list). The browser card uses it when a track is tapped in a list.
 ## Finding the Music Assistant `config_entry_id`
 
 In the card editor, pick Music Assistant from the drop-down. In YAML, open **Settings > Devices & services > Music Assistant**; the id is the last part of the URL of the integration entry, or use the drop-down of the `config_entry_id` field in **Developer tools > Actions**.

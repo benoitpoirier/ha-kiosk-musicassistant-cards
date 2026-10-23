@@ -1042,17 +1042,16 @@ export class MusicAssistantTouchCard extends HTMLElement {
     }
   }
 
-  // Start a track from a list. The whole list goes to Music Assistant in one
-  // command, starting at the tapped track (the ones before it go last): Music
-  // Assistant then owns the queue and moves on by itself, whatever happens to
-  // the card. Adding tracks afterwards from the browser could leave a queue of
-  // one when the card was closed or the follow-up call failed.
+  // Start a track from a list: it plays at once at the top of a new queue,
+  // and the rest of the list (from the tapped track on, the ones before it
+  // last) is appended by the integration in the background. Music Assistant
+  // then moves through the queue by itself; nothing depends on the card.
   async _speelLijst(uris, start, el) {
     const schoon = (uris || []).filter(Boolean);
     if (!schoon.length) return;
     const username = this._user();
     const i = Math.max(0, Math.min(start || 0, schoon.length - 1));
-    const rij = schoon.slice(i).concat(schoon.slice(0, i)).slice(0, 100);
+    const rij = schoon.slice(i).concat(schoon.slice(0, i)).slice(0, 200);
     const speler = this._speler();
     if (el) el.classList.add('bezig');
     this._opt = { state: 'playing', tot: Date.now() + 8000 };
@@ -1060,9 +1059,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
     try {
       await this._voorbereiden();
       await this._startVolume();
-      await this._call('music_assistant', 'play_media',
-        this._avecUser({ media_id: rij.length === 1 ? rij[0] : rij, enqueue: 'replace' }, username),
-        { entity_id: speler });
+      await this._call(DOMAIN, 'play_tracks', this._avecUser({ entity_id: speler, uris: rij }, username));
     } catch (e) {
       this._fout(e);
     } finally {

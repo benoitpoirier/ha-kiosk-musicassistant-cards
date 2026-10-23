@@ -95,6 +95,24 @@
           "description": "Number of items to return."
         }
       }
+    },
+    "play_tracks": {
+      "name": "Play tracks",
+      "description": "Play the first track at once (new queue), then append the others in the background.",
+      "fields": {
+        "entity_id": {
+          "name": "Player",
+          "description": "Music Assistant player."
+        },
+        "uris": {
+          "name": "Tracks",
+          "description": "Music Assistant URIs; the first one plays immediately."
+        },
+        "username": {
+          "name": "Music Assistant user",
+          "description": "Optional Music Assistant user to play as."
+        }
+      }
     }
   }
 }

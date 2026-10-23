@@ -91,3 +91,20 @@ get_queue_items:
           min: 1
           max: 100
           mode: box
+
+play_tracks:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          integration: music_assistant
+          domain: media_player
+    uris:
+      required: true
+      example: "['library://track/1', 'library://track/2']"
+      selector:
+        object:
+    username:
+      selector:
+        text:
