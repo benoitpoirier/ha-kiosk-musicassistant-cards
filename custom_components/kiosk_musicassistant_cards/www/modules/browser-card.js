@@ -486,7 +486,9 @@ export class MusicAssistantTouchCard extends HTMLElement {
       type: 'call_service', domain: DOMAIN, service: 'get_recommendations',
       service_data: data, return_response: true,
     }).then((r) => {
-      const rows = (r && r.response && r.response.rows) || [];
+      const rows = ((r && r.response && r.response.rows) || []).slice()
+        // Near-empty rows (a single "recently played" item) go last.
+        .sort((a, b) => (a.items.length < 3) - (b.items.length < 3));
       if (sleutel !== this._ontdekSleutel()) return;
       for (const row of rows) this._onthoudBeeld(row.items);
       this._ontdek = { sleutel, tijd: Date.now(), rows };
