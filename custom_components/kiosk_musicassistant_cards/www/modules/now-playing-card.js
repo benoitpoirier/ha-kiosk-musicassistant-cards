@@ -409,7 +409,7 @@ export class KioskNowPlayingCard extends HTMLElement {
       this._activeLyricIndex = -1;
       if (queueContextKey) this._loadQueueContext(entity, queueContextKey);
       // A new track: reopen the list on it.
-      if (this._queueOpen && queueContextKey) Promise.resolve().then(() => { if (this._queueOpen) this._loadQueue(); });
+      if (this._queueOpen && queueContextKey) Promise.resolve().then(() => { if (this._queueOpen) this._refreshQueue(); });
     }
     const picture = VEILIG(attributes.entity_picture_local || attributes.entity_picture || '');
     const signature = [entity, state && state.state, attributes.media_title, attributes.media_artist,
@@ -517,6 +517,41 @@ export class KioskNowPlayingCard extends HTMLElement {
       this._notice = error && error.message ? error.message : String(error);
     }
     this._sync();
+  }
+
+  // A new track while the list is open: fetch it again from the new current
+  // track and swap the rows in place - no "loading" flash - then go back to the
+  // top, where the track playing now is.
+  async _refreshQueue() {
+    const qs = this._qs;
+    const list = this.shadowRoot.getElementById('q-list');
+    if (!qs || qs.loading || !list) { this._loadQueue(); return; }
+    qs.loading = 'refresh';
+    let page;
+    try {
+      page = await this._queuePage(null, QUEUE_PAGE * 2);
+    } catch (error) {
+      qs.loading = null;
+      return;
+    }
+    if (this._qs !== qs || !this._queueOpen) return;
+    qs.loading = null;
+    qs.items = page.items || [];
+    qs.start = Number(page.offset) || 0;
+    qs.total = Number(page.total) || 0;
+    qs.current = page.current_index;
+    const t = this._t();
+    const rows = this.shadowRoot.getElementById('q-rows');
+    if (!rows || !qs.items.length) { this._loadQueue(); return; }
+    rows.innerHTML = qs.items.filter((item) => item.index >= this._queueFloor())
+      .map((item) => this._queueRowHtml(item, t)).join('');
+    const head = this.shadowRoot.getElementById('q-head');
+    if (head) head.textContent = this._queueCountText(t);
+    const top = this.shadowRoot.getElementById('q-top');
+    const bottom = this.shadowRoot.getElementById('q-bottom');
+    if (top) top.hidden = qs.start <= this._queueFloor();
+    if (bottom) bottom.hidden = qs.start + qs.items.length >= qs.total;
+    list.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   // Called after every render and on scroll: centres the current track once,
