@@ -172,6 +172,7 @@ ha-icon { pointer-events:none; }
 .skelet .tt { height:13px; width:80%; margin-top:10px; padding:0; border-radius:6px; }
 .skelet .st { height:11px; width:50%; margin-top:6px; padding:0; border-radius:6px; }
 .skelet-txt { height:18px; width:180px; border-radius:8px; }
+.ok-titel.skelet-txt { flex:0 0 180px; }
 
 /* discover: featured pick + one carousel per recommendation row */
 .ontdek { min-height:0; height:100%; overflow-y:auto; overflow-x:hidden; scrollbar-width:none;
@@ -468,27 +469,34 @@ export class MusicAssistantTouchCard extends HTMLElement {
     if (!this._hass || !this._cfg || !this._discover) return Promise.resolve();
     const sleutel = this._ontdekSleutel();
     const c = this._ontdek;
-    if (!force && c && c.sleutel === sleutel && Date.now() - c.tijd < BIB_TTL) return Promise.resolve();
+    if (!force && c && c.sleutel === sleutel && Date.now() - c.tijd < BIB_TTL) {
+      // Already fetched, but the view may still show the placeholders (the
+      // card was rebuilt or re-attached while the answer was on its way).
+      if (this._mode === 'ontdek' && this._ontdekGetekend !== c) this._tekenRechts();
+      return Promise.resolve();
+    }
     if (this._ontdekBezig && this._ontdekBezig.sleutel === sleutel) return this._ontdekBezig.p;
-    const generation = this._sourceGeneration;
-    const data = { config_entry_id: this._cfg.config_entry_id, row_limit: 20 };
+    const data = {
+      config_entry_id: this._cfg.config_entry_id,
+      row_limit: 20,
+      include_hidden: this._cfg.discover_hidden_rows !== false,
+    };
     if (this._user()) data.username = this._user();
     const p = this._ws({
       type: 'call_service', domain: DOMAIN, service: 'get_recommendations',
       service_data: data, return_response: true,
     }).then((r) => {
       const rows = (r && r.response && r.response.rows) || [];
-      if (generation !== this._sourceGeneration) return;
+      if (sleutel !== this._ontdekSleutel()) return;
       for (const row of rows) this._onthoudBeeld(row.items);
       this._ontdek = { sleutel, tijd: Date.now(), rows };
     }).catch((error) => {
-      if (generation !== this._sourceGeneration) return;
+      if (sleutel !== this._ontdekSleutel()) return;
       this._ontdek = { sleutel, tijd: Date.now(), rows: [], fout: true };
       this._fout(error);
     }).finally(() => {
       if (this._ontdekBezig && this._ontdekBezig.p === p) this._ontdekBezig = null;
-      if (this.isConnected && this._mode === 'ontdek'
-        && generation === this._sourceGeneration) this._tekenRechts();
+      if (this._mode === 'ontdek') this._tekenRechts();
     });
     this._ontdekBezig = { sleutel, p };
     return p;
@@ -1565,6 +1573,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
     const t = this._taal();
     const chips = this._tabsHtml();
     const c = this._ontdek && this._ontdek.sleutel === this._ontdekSleutel() ? this._ontdek : null;
+    this._ontdekGetekend = c;
     if (!c) {
       const skelet = [0, 1].map(() => `<section class="ok-rij"><div class="ok-kop"><div class="ok-titel skelet-txt"></div></div>${this._skeletHtml(8, true)}</section>`).join('');
       return chips + this._scrollbox(`<div class="ontdek vlak"><div class="held skelet"></div>${skelet}</div>`);

@@ -123,6 +123,7 @@ links:
 | `fill_margin` | `8` | Bottom margin in pixels when `fill` is enabled. |
 | `arrows` | `true` | Scroll buttons and a draggable scrollbar next to lists (for devices where touch scrolling is unreliable, e.g. cast displays). Also adds left/right buttons to the Discover carousels. |
 | `discover` | `true` | Show the *Discover* tab (first tab, opened by default) with Music Assistant's recommendation rows for the selected music source. |
+| `discover_hidden_rows` | `true` | Also show the rows Music Assistant hides by default (random, forgotten, most played, ...). `false` keeps only the default rows. YAML only. |
 | `kiosk_theme` | `true` | Kiosk styling with large touch targets. Set to `false` to follow the plain Home Assistant theme. |
 | `language` | HA language | `en`, `fr` or `nl`. |
 | `volume_max` | `100` | Maximum volume (%); also the end of the slider. |
