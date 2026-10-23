@@ -292,7 +292,15 @@ ha-icon { pointer-events:none; }
         transition:top .12s linear, height .12s linear; }
 .rail.sleep .duim { transition:none; background:var(--zacht); }
 .leeg { color:var(--flauw); font-size:13px; padding:16px 2px; }
-#melding { padding:2px 2px 0; min-height:14px; font-size:11.5px; color:#ff8a80; flex:0 0 auto; }
+/* errors: a toast over the card, visible whether the player column is shown or not */
+#melding { position:absolute; left:50%; bottom:18px; z-index:6; max-width:min(80%,560px);
+  transform:translateX(-50%); display:flex; align-items:center; gap:10px; padding:12px 18px;
+  border-radius:16px; background:rgba(127,29,29,.92); color:#ffe4e0; font-size:14px; font-weight:600;
+  line-height:1.3; box-shadow:0 12px 32px rgba(0,0,0,.45); animation:toast .25s ease; }
+#melding:empty { display:none; }
+#melding::before { content:'!'; flex:none; width:22px; height:22px; border-radius:50%; display:grid; place-items:center;
+  background:#fecaca; color:#7f1d1d; font-weight:900; font-size:14px; }
+@keyframes toast { from { opacity:0; transform:translate(-50%,10px); } to { opacity:1; transform:translateX(-50%); } }
 
 /* optionele navigatieknoppen naar andere views, binnen de kaart zelf */
 .links { display:flex; gap:8px; flex-wrap:wrap; flex:0 0 auto; padding-top:8px;
@@ -1090,6 +1098,8 @@ export class MusicAssistantTouchCard extends HTMLElement {
     }
   }
   _fout(e) {
+    // A failed command must not leave the optimistic "playing" state behind.
+    if (this._opt) { this._opt = null; this._npSig = null; this._syncSpeler(); }
     const el = this.shadowRoot.getElementById('melding');
     if (!el) return;
     el.textContent = (e && e.message ? e.message : String(e));
@@ -1199,11 +1209,11 @@ export class MusicAssistantTouchCard extends HTMLElement {
             <button class="vk" data-vol="1" aria-label="+">${svg('plus')}</button>
             <div class="vollbl vol-label" id="vollbl"></div>
           </div>
-          <div id="melding"></div>
           <div class="links" id="links"></div>
         </div>
         <div class="scheiding">${this._spelerKnopHtml()}</div>
         <div class="col right" id="right"></div>
+        <div id="melding" role="alert"></div>
       </div>`;
     this._observeKioskEditMode();
     this._tekenZones();

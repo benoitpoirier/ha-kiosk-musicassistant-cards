@@ -308,7 +308,7 @@ data:
   username: alice   # optional
 ```
 
-Plays the first track at once in a new queue, then appends the other tracks in the background (Music Assistant resolves every track of a `play_media` call before starting, which takes a long time for a long list). The browser card uses it when a track is tapped in a list. Calls for the same player run one after the other and a newer list stops the background append of the previous one, so tapping several tracks in a row always ends with the last one and its list.
+Plays the first track at once in a new queue, then appends the other tracks in the background (Music Assistant resolves every track of a `play_media` call before starting, which takes a long time for a long list). The browser card uses it when a track is tapped in a list. Tracks that cannot be played are skipped (the first playable one starts). Calls for the same player run one after the other and a newer list stops the background append of the previous one, so tapping several tracks in a row always ends with the last one and its list.
 ## Finding the Music Assistant `config_entry_id`
 
 In the card editor, pick Music Assistant from the drop-down. In YAML, open **Settings > Devices & services > Music Assistant**; the id is the last part of the URL of the integration entry, or use the drop-down of the `config_entry_id` field in **Developer tools > Actions**.

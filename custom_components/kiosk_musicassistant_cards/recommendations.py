@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import re
 import time
 from typing import Any
 
@@ -18,6 +19,16 @@ from music_assistant_models.media_items import media_from_dict
 
 _LOGGER = logging.getLogger(__name__)
 
+# 'spotify--AbC123://track/x' names one account of a provider. Music Assistant
+# shares similar-track listings between users, so such a uri can point at an
+# account the Music Assistant user playing it may not use ("could not resolve").
+# The provider's own uri ('spotify://track/x') lets Music Assistant pick an
+# account that user has. Library uris and others are left alone.
+_INSTANCE_URI = re.compile(r"^([a-z0-9_]+)--[A-Za-z0-9]+://")
+
+
+def _portable_uri(uri: str) -> str:
+    return _INSTANCE_URI.sub(r"\1://", uri)
 TOP_PICKS_LIMIT = 9
 MAX_TOP_PICKS_LIMIT = 100
 RECENTLY_PLAYED_LIMIT = 12
@@ -95,7 +106,7 @@ def _serialize_item(mass: Any, raw_item: Any, reason: str) -> dict[str, Any]:
     ]
     return {
         "name": name,
-        "uri": uri,
+        "uri": _portable_uri(uri),
         "image": item.get("image"),
         "media_type": str(item.get("media_type") or ""),
         "artist": ", ".join(artists[:2]) or None,

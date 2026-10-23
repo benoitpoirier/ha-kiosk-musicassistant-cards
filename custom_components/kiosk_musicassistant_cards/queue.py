@@ -103,6 +103,7 @@ async def async_get_queue_items(call: ServiceCall) -> dict[str, Any]:
 # let finish (cancelling it locally would not stop the server from appending
 # it to the new queue), which is why batches stay small.
 FIRST_BATCH = 5
+MAX_SKIPS = 4
 BATCH = 10
 DATA_PLAY = "kiosk_musicassistant_cards_play"
 
@@ -133,11 +134,25 @@ async def async_play_tracks(call: ServiceCall) -> None:
             target={"entity_id": entity_id}, blocking=True,
         )
 
+    # A track that cannot be played (gone, region-locked, an account the user
+    # may not use) must not stop the list: start the first one that plays.
+    started = None
+    first_error: Exception | None = None
     async with player["lock"]:
         if generation != player["generation"]:
             return  # an even newer tap is waiting: it wins
-        await play(uris[0], "replace")
-    rest = uris[1:]
+        for index, uri in enumerate(uris[:MAX_SKIPS + 1]):
+            try:
+                await play(uri, "replace")
+            except HomeAssistantError as err:
+                _LOGGER.debug("Skipping %s: %s", uri, err)
+                first_error = first_error or err
+                continue
+            started = index
+            break
+    if started is None:
+        raise first_error or HomeAssistantError("Nothing in the list could be played")
+    rest = uris[started + 1:]
     if not rest:
         return
 
@@ -145,13 +160,21 @@ async def async_play_tracks(call: ServiceCall) -> None:
         batches = [rest[:FIRST_BATCH]] + [
             rest[index:index + BATCH] for index in range(FIRST_BATCH, len(rest), BATCH)
         ]
-        try:
-            for batch in batches:
-                async with player["lock"]:
-                    if generation != player["generation"]:
-                        return
+        for batch in batches:
+            async with player["lock"]:
+                if generation != player["generation"]:
+                    return
+                try:
                     await play(batch, "add")
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.warning("Could not queue the rest of the list on %s: %s", entity_id, err)
+                except HomeAssistantError:
+                    # One bad uri fails the whole batch: add them one by one.
+                    for uri in batch:
+                        try:
+                            await play(uri, "add")
+                        except HomeAssistantError as err:
+                            _LOGGER.debug("Skipping %s: %s", uri, err)
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.warning("Could not queue the rest of the list on %s: %s", entity_id, err)
+                    return
 
     hass.async_create_background_task(append(), "kiosk_musicassistant_cards queue tracks")
