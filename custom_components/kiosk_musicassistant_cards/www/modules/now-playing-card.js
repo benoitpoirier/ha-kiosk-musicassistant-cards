@@ -3,88 +3,113 @@ import { VEILIG, esc, svg, taalVan } from './shared.js';
 const DOMAIN = 'kiosk_musicassistant_cards';
 
 const NOW_PLAYING_STYLE = `
-:host { display:block; width:100%; height:100%; min-height:480px; color:#fff; }
+:host { display:block; width:100%; height:100%; min-height:420px; color:#fff;
+  --np-grad:linear-gradient(90deg,#f6b26b,#e5739b); }
 * { box-sizing:border-box; }
+button { font:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent;
+  transition:transform .1s ease, background .15s ease, color .15s ease, opacity .15s ease; }
+button:active { transform:scale(.94); }
 .shell { position:relative; isolation:isolate; width:100%; height:var(--now-playing-height,560px);
-  min-height:480px; max-height:780px; overflow:hidden; border-radius:14px; background:#073d49; }
-.background { position:absolute; z-index:-2; inset:-40px; background-position:center; background-size:cover;
-  filter:blur(34px) saturate(1.12) brightness(.56); transform:scale(1.1); }
+  min-height:420px; max-height:var(--now-playing-max,780px); overflow:hidden; border-radius:26px; background:#0b1b24;
+  box-shadow:0 20px 50px rgba(0,0,0,.35); }
+.background { position:absolute; z-index:-2; inset:-60px; background-position:center; background-size:cover;
+  filter:blur(46px) saturate(1.35) brightness(.55); transform:scale(1.15); transition:background-image .6s ease; }
 .shade { position:absolute; z-index:-1; inset:0;
-  background:linear-gradient(105deg,rgba(4,61,70,.28),rgba(5,29,48,.86)); }
-.layout { position:relative; display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);
-  grid-template-rows:minmax(0,1fr) auto; align-items:stretch; gap:18px 28px; height:100%; padding:28px; }
-.cover-area { display:grid; grid-row:1 / span 2; min-width:0; place-items:center; }
-.cover,.cover-empty { width:min(100%,380px); aspect-ratio:1; border-radius:20px;
-  box-shadow:0 18px 44px rgba(0,0,0,.4); }
+  background:radial-gradient(120% 90% at 0% 0%,rgba(0,0,0,.05),rgba(0,0,0,.45)),
+    linear-gradient(105deg,rgba(6,22,32,.15),rgba(6,16,26,.78)); }
+.layout { position:relative; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  grid-template-rows:minmax(0,1fr) auto; align-items:stretch; gap:16px 36px; height:100%; padding:32px 36px; }
+.cover-area { display:grid; grid-row:1 / span 2; min-width:0; min-height:0; place-items:center; }
+.cover,.cover-empty,.lyrics-pane { width:min(100%, calc(var(--now-playing-height,560px) - 64px), 560px);
+  aspect-ratio:1; border-radius:24px; box-shadow:0 30px 60px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.06); }
 .cover { object-fit:cover; }
-.cover-empty { display:grid; place-items:center; background:rgba(0,0,0,.22); color:rgba(255,255,255,.65); }
-.cover-empty ha-icon { --mdc-icon-size:72px; }
-.lyrics-pane { width:min(100%,380px); aspect-ratio:1; overflow:auto; border-radius:20px;
-  background:rgba(0,0,0,.22); box-shadow:0 18px 44px rgba(0,0,0,.4); scrollbar-width:none; }
+.cover-empty { display:grid; place-items:center; background:rgba(255,255,255,.06); color:rgba(255,255,255,.6); }
+.cover-empty ha-icon { --mdc-icon-size:88px; }
+.lyrics-pane { overflow:auto; background:rgba(0,0,0,.28); scrollbar-width:none; }
 .lyrics-pane::-webkit-scrollbar { display:none; }
 .lyrics-lines { display:flex; min-height:100%; flex-direction:column; align-items:center;
-  justify-content:center; gap:14px; padding:24px 18px; text-align:center; }
-.lyric-line { flex:none; color:rgba(255,255,255,.56); font-size:17px; font-weight:550;
+  justify-content:center; gap:16px; padding:28px 22px; text-align:center; }
+.lyric-line { flex:none; color:rgba(255,255,255,.45); font-size:18px; font-weight:600;
   line-height:1.35; overflow-wrap:anywhere; transition:color .25s, opacity .25s, font-size .25s; }
-.lyric-line.active { color:#fff; font-size:22px; font-weight:750; }
-.side { display:flex; grid-column:2; grid-row:1; min-width:0; flex-direction:column; justify-content:center; gap:14px; padding:28px 4px 0 0; }
-.bottom-controls { display:flex; grid-column:2; grid-row:2; min-width:0; flex-direction:column; gap:6px; padding:0 4px 4px 0; }
-.status { position:absolute; top:14px; right:14px; z-index:1; display:flex; align-items:center; gap:7px;
-  max-width:calc(100% - 28px); padding:8px 13px; border-radius:999px; background:rgba(0,18,27,.72);
-  font-size:13px; font-weight:650; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.status ha-icon { --mdc-icon-size:16px; flex:none; }
-.players { display:flex; flex-wrap:wrap; gap:7px; min-height:0; }
+.lyric-line.active { color:#fff; font-size:24px; font-weight:800; }
+.side { display:flex; grid-column:2; grid-row:1; min-width:0; min-height:0; flex-direction:column;
+  justify-content:center; gap:12px; padding:30px 0 0; }
+.bottom-controls { display:flex; grid-column:2; grid-row:2; min-width:0; flex-direction:column; gap:6px; }
+.status { position:absolute; top:18px; right:18px; z-index:1; display:flex; align-items:center; gap:8px;
+  max-width:calc(100% - 36px); padding:9px 15px; border-radius:999px; background:rgba(0,0,0,.32);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);
+  font-size:13px; font-weight:650; letter-spacing:.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.status ha-icon { --mdc-icon-size:17px; flex:none; color:#f6b26b; }
+.players { display:flex; flex-wrap:wrap; gap:8px; min-height:0; }
 .players:empty { display:none; }
-.players button { display:inline-flex; align-items:center; gap:6px; min-height:38px; padding:0 11px;
-  border:1px solid rgba(255,255,255,.22); border-radius:999px; background:rgba(0,24,34,.38);
-  color:rgba(255,255,255,.78); font:inherit; font-size:13px; }
-.players button.active { border-color:rgba(255,255,255,.72); background:rgba(255,255,255,.18); color:#fff; }
-.players ha-icon { --mdc-icon-size:17px; }
-.title { max-height:2.22em; overflow:hidden; font-size:36px; font-weight:750; line-height:1.1;
+.players button { display:inline-flex; align-items:center; gap:7px; min-height:42px; padding:0 15px;
+  border:0; border-radius:999px; background:rgba(255,255,255,.1);
+  color:rgba(255,255,255,.8); font-size:14px; font-weight:600; }
+.players button.active { background:#fff; color:#0b1b24; }
+.players ha-icon { --mdc-icon-size:18px; }
+.title { max-height:2.24em; overflow:hidden; font-size:40px; font-weight:800; letter-spacing:-.8px; line-height:1.12;
   overflow-wrap:anywhere; }
-.artist { overflow:hidden; color:rgba(255,255,255,.78); font-size:22px; line-height:1.3; text-overflow:ellipsis; white-space:nowrap; }
-.album { overflow:hidden; color:rgba(255,255,255,.64); font-size:18px; line-height:1.3; text-overflow:ellipsis; white-space:nowrap; }
-.context { overflow:hidden; color:rgba(255,255,255,.62); font-size:13px; text-overflow:ellipsis; white-space:nowrap; }
-.progress { position:relative; display:block; width:100%; height:48px; padding:0; border:0; background:transparent; color:inherit; }
-.track { position:absolute; top:20px; right:0; left:0; height:5px; overflow:hidden; border-radius:99px; background:rgba(255,255,255,.3); }
-.fill { display:block; width:0; height:100%; border-radius:inherit; background:#fff; transition:width .2s linear; }
-.thumb { position:absolute; top:50%; left:0; width:16px; height:16px; border-radius:50%; background:#fff;
-  box-shadow:0 1px 4px rgba(0,0,0,.3); transform:translate(-50%,-50%); }
-.times { display:flex; justify-content:space-between; margin-top:29px; color:rgba(255,255,255,.72); font-size:13px; }
-.transport,.actions { display:flex; align-items:center; justify-content:center; gap:14px; }
-button.icon { display:grid; flex:none; width:48px; height:48px; place-items:center; border:0; border-radius:50%;
-  background:transparent; color:rgba(255,255,255,.78); }
+.artist { overflow:hidden; color:rgba(255,255,255,.85); font-size:22px; font-weight:600; line-height:1.3;
+  text-overflow:ellipsis; white-space:nowrap; }
+.album { overflow:hidden; color:rgba(255,255,255,.6); font-size:17px; line-height:1.3; text-overflow:ellipsis; white-space:nowrap; }
+.context { align-self:flex-start; max-width:100%; overflow:hidden; padding:5px 11px; border-radius:999px;
+  background:rgba(255,255,255,.08); color:rgba(255,255,255,.7); font-size:12.5px; font-weight:600;
+  text-overflow:ellipsis; white-space:nowrap; }
+.context:empty { display:none; }
+.progress { position:relative; display:block; width:100%; height:50px; padding:0; border:0; background:transparent; color:inherit; }
+.progress:active { transform:none; }
+.track { position:absolute; top:20px; right:0; left:0; height:6px; overflow:hidden; border-radius:99px; background:rgba(255,255,255,.22); }
+.fill { display:block; width:0; height:100%; border-radius:inherit; background:var(--np-grad); transition:width .2s linear; }
+.thumb { position:absolute; top:50%; left:0; width:18px; height:18px; border-radius:50%; background:#fff;
+  box-shadow:0 2px 8px rgba(0,0,0,.4); transform:translate(-50%,-50%); }
+.times { display:flex; justify-content:space-between; margin-top:30px; color:rgba(255,255,255,.7); font-size:13px;
+  font-variant-numeric:tabular-nums; }
+.transport,.actions { display:flex; align-items:center; justify-content:center; gap:18px; }
+button.icon { display:grid; flex:none; width:56px; height:56px; place-items:center; border:0; border-radius:50%;
+  background:rgba(255,255,255,.08); color:rgba(255,255,255,.88); }
 button.icon:disabled { opacity:.35; }
-button.icon ha-icon { --mdc-icon-size:27px; }
-button.play { width:76px; height:76px; background:#fff; color:#092d39; }
-button.play ha-icon { --mdc-icon-size:38px; }
-button.on { color:#fff; background:rgba(255,255,255,.16); }
-.actions { justify-content:flex-start; gap:5px; }
-.actions button.icon { width:46px; height:46px; }
-.volume-row { display:grid; grid-template-columns:46px minmax(0,1fr) 46px; align-items:center;
-  gap:10px; width:100%; min-height:48px; }
-.volume-row button.icon { width:46px; height:46px; background:rgba(255,255,255,.07); }
-.volume-range { width:100%; min-width:0; height:48px; margin:0; padding:0; accent-color:#fff; touch-action:pan-y; }
-.queue { max-height:112px; overflow:auto; border-top:1px solid rgba(255,255,255,.16); padding-top:7px; }
-.queue-title { padding:0 0 5px; color:rgba(255,255,255,.76); font-size:13px; font-weight:650; }
-.queue-row { overflow:hidden; padding:4px 0; color:rgba(255,255,255,.76); font-size:13px; text-overflow:ellipsis; white-space:nowrap; }
+button.icon ha-icon { --mdc-icon-size:28px; }
+button.play { width:84px; height:84px; background:#fff; color:#0b1b24; box-shadow:0 12px 30px rgba(0,0,0,.35); }
+button.play ha-icon { --mdc-icon-size:42px; }
+button.on { color:#0b1b24; background:#fff; }
+.actions { justify-content:center; gap:10px; }
+.actions button.icon { width:48px; height:48px; background:transparent; }
+.actions button.icon.on { background:rgba(255,255,255,.92); }
+.actions button.icon ha-icon { --mdc-icon-size:24px; }
+.volume-row { display:grid; grid-template-columns:48px minmax(0,1fr) 48px; align-items:center;
+  gap:12px; width:100%; min-height:56px; padding:4px; border-radius:999px; background:rgba(0,0,0,.22); }
+.volume-row button.icon { width:48px; height:48px; background:rgba(255,255,255,.08); }
+.volume-row button.icon ha-icon { --mdc-icon-size:24px; }
+.volume-range { width:100%; min-width:0; height:48px; margin:0; padding:0; accent-color:#f6b26b; touch-action:pan-y; }
+.queue { max-height:132px; overflow:auto; padding:10px 14px; border-radius:16px; background:rgba(0,0,0,.25); }
+.queue-title { padding:0 0 6px; color:rgba(255,255,255,.85); font-size:12px; font-weight:750; letter-spacing:.6px;
+  text-transform:uppercase; }
+.queue-row { overflow:hidden; padding:5px 0; color:rgba(255,255,255,.78); font-size:14px; text-overflow:ellipsis; white-space:nowrap; }
+.queue-row + .queue-row { border-top:1px solid rgba(255,255,255,.08); }
 .notice { min-height:0; color:#ffd0c7; font-size:13px; }
+@media (max-height:700px) {
+  .layout { padding:22px 26px; gap:12px 26px; }
+  .title { font-size:32px; }
+  .artist { font-size:19px; }
+  button.play { width:72px; height:72px; }
+  button.icon { width:50px; height:50px; }
+}
 @media (max-width:700px) {
   :host { min-height:100vh; }
-  .shell { height:auto; min-height:100vh; max-height:none; }
+  .shell { height:auto; min-height:100vh; max-height:none; border-radius:0; }
   .layout { grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto auto;
     align-content:center; gap:18px; min-height:100vh; padding:76px 20px 20px; }
   .cover-area { grid-column:1; grid-row:1; }
-  .cover,.cover-empty { width:min(62vw,300px); }
-  .lyrics-pane { width:min(62vw,300px); }
+  .cover,.cover-empty,.lyrics-pane { width:min(68vw,320px); }
   .lyric-line { font-size:15px; }
   .lyric-line.active { font-size:19px; }
   .side { grid-column:1; grid-row:2; gap:10px; padding:0; }
   .bottom-controls { grid-column:1; grid-row:3; padding:0; }
   .title { font-size:27px; text-align:center; }
-  .artist,.album,.context { text-align:center; }
-  .transport { gap:10px; }
-  .actions { justify-content:center; flex-wrap:wrap; }
+  .artist,.album { text-align:center; }
+  .context { align-self:center; }
+  .transport { gap:12px; }
+  .actions { flex-wrap:wrap; }
 }
 `;
 
@@ -151,6 +176,12 @@ export class KioskNowPlayingCard extends HTMLElement {
 
   connectedCallback() {
     this._startProgressTimer();
+    if (this._cfg && this._cfg.fill === true && !this._resizeListener && this.shadowRoot.firstChild) {
+      this._resizeListener = () => this._fillHeight();
+      window.addEventListener('resize', this._resizeListener);
+      this._filledHeight = null;
+      requestAnimationFrame(() => this._fillHeight());
+    }
   }
 
   set hass(hass) {
@@ -162,13 +193,13 @@ export class KioskNowPlayingCard extends HTMLElement {
 
   _startProgressTimer() {
     if (this._timer) return;
-    this._timer = setInterval(() => this._updateProgress(), 1000);
+    this._timer = setInterval(() => { this._updateProgress(); this._fillHeight(); }, 1000);
   }
 
   getCardSize() { return 5; }
 
   _build() {
-    const height = Math.max(480, Math.min(780, Number(this._cfg.height) || 560));
+    const height = Math.max(420, Math.min(780, Number(this._cfg.height) || 560));
     const t = this._t();
     this.shadowRoot.innerHTML = `<style>${NOW_PLAYING_STYLE}</style>
       <section class="shell" style="--now-playing-height:${height}px">
@@ -199,6 +230,27 @@ export class KioskNowPlayingCard extends HTMLElement {
     this.shadowRoot.addEventListener('click', (event) => this._click(event));
     this.shadowRoot.addEventListener('change', (event) => this._change(event));
     this._startProgressTimer();
+    if (this._cfg.fill === true) {
+      requestAnimationFrame(() => this._fillHeight());
+      if (!this._resizeListener) {
+        this._resizeListener = () => this._fillHeight();
+        window.addEventListener('resize', this._resizeListener);
+      }
+    }
+  }
+
+  // fill: true -> use the screen height left below the top of the card, so a
+  // panel view on a 1280x800 kiosk gets a full-screen player.
+  _fillHeight() {
+    if (this._cfg.fill !== true || !this.isConnected) return;
+    const shell = this.shadowRoot && this.shadowRoot.querySelector('.shell');
+    if (!shell) return;
+    const margin = this._cfg.fill_margin == null ? 8 : Number(this._cfg.fill_margin) || 0;
+    const height = Math.max(420, Math.round(window.innerHeight - this.getBoundingClientRect().top - margin));
+    if (height === this._filledHeight) return;
+    this._filledHeight = height;
+    shell.style.setProperty('--now-playing-height', `${height}px`);
+    shell.style.setProperty('--now-playing-max', 'none');
   }
 
   _state(entity) { return this._hass && this._hass.states ? this._hass.states[entity] : null; }
@@ -622,6 +674,10 @@ export class KioskNowPlayingCard extends HTMLElement {
   disconnectedCallback() {
     clearInterval(this._timer);
     this._timer = null;
+    if (this._resizeListener) {
+      window.removeEventListener('resize', this._resizeListener);
+      this._resizeListener = null;
+    }
   }
 }
 

@@ -39,6 +39,28 @@
           "description": "Maximum number of items to return."
         }
       }
+    },
+    "get_recommendations": {
+      "name": "Get recommendations",
+      "description": "Return Music Assistant's recommendation rows (discover feed), each with its items.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Music Assistant",
+          "description": "The Music Assistant config entry to query."
+        },
+        "username": {
+          "name": "Music Assistant user",
+          "description": "Optional Music Assistant username to fetch the recommendations for."
+        },
+        "row_limit": {
+          "name": "Items per row",
+          "description": "Maximum number of items per recommendation row."
+        },
+        "include_hidden": {
+          "name": "Include hidden rows",
+          "description": "Also return the rows Music Assistant hides by default."
+        }
+      }
     }
   }
 }

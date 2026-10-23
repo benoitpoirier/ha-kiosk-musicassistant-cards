@@ -39,6 +39,28 @@
           "description": "Nombre maximal d’éléments retournés."
         }
       }
+    },
+    "get_recommendations": {
+      "name": "Obtenir les recommandations",
+      "description": "Retourne les lignes de recommandations de Music Assistant (découvertes), chacune avec ses éléments.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Music Assistant",
+          "description": "L’entrée de configuration Music Assistant à interroger."
+        },
+        "username": {
+          "name": "Utilisateur Music Assistant",
+          "description": "Nom d’utilisateur Music Assistant facultatif pour lequel obtenir les recommandations."
+        },
+        "row_limit": {
+          "name": "Éléments par ligne",
+          "description": "Nombre maximal d’éléments par ligne de recommandations."
+        },
+        "include_hidden": {
+          "name": "Inclure les lignes masquées",
+          "description": "Retourne aussi les lignes que Music Assistant masque par défaut."
+        }
+      }
     }
   }
 }

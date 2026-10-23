@@ -13,13 +13,19 @@ from homeassistant.loader import async_get_integration
 from music_assistant_models.media_items import Track
 
 from .const import CARD_URL, DOMAIN, STATIC_URL
-from .recommendations import GET_TOP_PICKS_SCHEMA, async_get_top_picks
+from .recommendations import (
+    GET_RECOMMENDATIONS_SCHEMA,
+    GET_TOP_PICKS_SCHEMA,
+    async_get_recommendations,
+    async_get_top_picks,
+)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 WWW_PATH = Path(__file__).parent / "www"
 SERVICE_GET_TRACK_LYRICS = "get_track_lyrics"
 SERVICE_GET_TOP_PICKS = "get_top_picks"
+SERVICE_GET_RECOMMENDATIONS = "get_recommendations"
 
 
 async def _async_get_track_lyrics(call: ServiceCall) -> dict[str, str | None]:
@@ -52,6 +58,13 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         SERVICE_GET_TOP_PICKS,
         async_get_top_picks,
         schema=GET_TOP_PICKS_SCHEMA,
+        supports_response=SupportsResponse.ONLY,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_RECOMMENDATIONS,
+        async_get_recommendations,
+        schema=GET_RECOMMENDATIONS_SCHEMA,
         supports_response=SupportsResponse.ONLY,
     )
     return True

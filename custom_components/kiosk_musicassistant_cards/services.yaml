@@ -25,3 +25,26 @@ get_top_picks:
           min: 1
           max: 100
           mode: box
+
+get_recommendations:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: music_assistant
+    username:
+      example: "kiosk_alice"
+      selector:
+        text:
+    row_limit:
+      default: 20
+      selector:
+        number:
+          min: 1
+          max: 50
+          mode: box
+    include_hidden:
+      default: false
+      selector:
+        boolean:

@@ -3,7 +3,7 @@ import { MusicAssistantTouchCard } from './modules/browser-card.js';
 import { MusicAssistantTouchCardEditor } from './modules/card-editor.js';
 import { KioskNowPlayingCard } from './modules/now-playing-card.js';
 
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const DOCS = 'https://github.com/benoitpoirier/ha-kiosk-musicassistant-cards';
 
 const elements = [

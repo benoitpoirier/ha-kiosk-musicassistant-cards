@@ -154,6 +154,7 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
           { name: 'fill_margin', selector: { number: { min: 0, max: 200, step: 1, mode: 'box' } } },
         ] },
         { name: 'fill', selector: { boolean: {} } },
+        { name: 'discover', selector: { boolean: {} } },
         { name: 'arrows', selector: { boolean: {} } },
         { name: 'kiosk_theme', selector: { boolean: {} } },
         { name: 'language', selector: { select: { mode: 'dropdown', options: [
@@ -166,6 +167,7 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         height: c.height == null ? 556 : c.height,
         fill_margin: c.fill_margin == null ? 8 : c.fill_margin,
         fill: c.fill === true,
+        discover: c.discover !== false,
         arrows: c.arrows !== false,
         kiosk_theme: c.kiosk_theme !== false,
         language: c.language || '',
@@ -176,6 +178,7 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
           delete this._cfg.fill_margin;
         } else this._cfg.fill_margin = v.fill_margin;
         if (v.fill) this._cfg.fill = true; else delete this._cfg.fill;
+        if (v.discover === false) this._cfg.discover = false; else delete this._cfg.discover;
         this._cfg.arrows = !!v.arrows;
         if (v.kiosk_theme === false) this._cfg.kiosk_theme = false; else delete this._cfg.kiosk_theme;
         if (v.language) this._cfg.language = v.language; else delete this._cfg.language;

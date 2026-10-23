@@ -9,7 +9,10 @@ const STYLE = `
 :host {
   display:block;
   container-type:inline-size;
+  container-name:kaart;
   --acc:#1DB954;
+  --grad:var(--acc);
+  --acc-glow:rgba(29,185,84,.35);
   --ov1:rgba(255,255,255,.05);
   --ov2:rgba(255,255,255,.09);
   --line:rgba(255,255,255,.07);
@@ -115,24 +118,114 @@ ha-icon { pointer-events:none; }
 .chips button.zoektab { margin-left:auto; flex:0 0 auto; display:flex; align-items:center; }
 .chips button.zoektab ha-icon { --mdc-icon-size:19px; }
 
-.tiles { min-height:0; max-width:100%; height:100%; overflow-y:auto; overflow-x:hidden; display:grid;
-         grid-template-columns:repeat(4,minmax(0,1fr)); gap:11px 12px; align-content:start;
-         padding-top:2px; scrollbar-width:none; }
+/* Responsive tile grid: as many columns as fit, tiles grow with the screen.
+   --tmin is the smallest a tile may get; it rises with the width of the right
+   column (container 'rechts'), so a bigger screen gets bigger artwork rather
+   than just more of it. */
+.right { container-type:inline-size; container-name:rechts; }
+.tiles { --tmin:136px; min-height:0; max-width:100%; height:100%; overflow-y:auto; overflow-x:hidden;
+         display:grid; grid-template-columns:repeat(auto-fill,minmax(var(--tmin),1fr));
+         gap:18px 16px; align-content:start; padding:4px 2px 12px; scrollbar-width:none; }
 .tiles::-webkit-scrollbar { display:none; }
-.tile { display:flex; flex-direction:column; align-items:center; min-width:0; max-width:100%;
-        position:relative; }
-.tile img, .tile .ph, .tile .ic { width:var(--tw,108px); height:var(--tw,108px); max-width:100%;
-       border-radius:9px; object-fit:cover; }
-.tile img { box-shadow:0 4px 12px rgba(0,0,0,.3); }
-.tile .ph { background:var(--ov1); }
-.tile .ic { background:var(--ov1); display:flex; align-items:center; justify-content:center; }
-.tile .ic ha-icon { --mdc-icon-size:36px; color:var(--acc); opacity:.85; }
-.tile span { font-size:11.5px; padding-top:6px; max-width:var(--tw,108px); color:var(--zacht);
-             white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center; }
-.tile .reason { position:absolute; top:5px; left:5px; max-width:calc(100% - 10px);
-                padding:3px 6px; border-radius:999px; background:rgba(0,0,0,.72); color:#fff;
-                font-size:10px; font-weight:600; line-height:1.2; white-space:nowrap;
-                overflow:hidden; text-overflow:ellipsis; }
+@container rechts (max-width: 600px) { .tiles { --tmin:112px; gap:14px 12px; } }
+@container rechts (max-width: 420px) { .tiles { --tmin:96px; gap:12px 10px; } }
+@container rechts (min-width: 1000px) { .tiles { --tmin:168px; gap:22px 20px; } }
+@container rechts (min-width: 1300px) { .tiles { --tmin:196px; gap:26px 22px; } }
+@container rechts (min-width: 1700px) { .tiles { --tmin:228px; } }
+
+.tile { display:flex; flex-direction:column; align-items:stretch; min-width:0; max-width:100%;
+        position:relative; text-align:left; border-radius:14px; }
+.tile .cover { position:relative; width:100%; aspect-ratio:1; border-radius:12px; overflow:hidden;
+               background:var(--ov1); box-shadow:0 8px 22px rgba(0,0,0,.28);
+               transition:transform .18s ease, box-shadow .18s ease; }
+.tile.rond .cover { border-radius:50%; }
+.tile .cover img { width:100%; height:100%; object-fit:cover; display:block; }
+.tile .cover .ic { width:100%; height:100%; display:flex; align-items:center; justify-content:center;
+                   background:linear-gradient(145deg,var(--ov2),var(--ov1)); }
+.tile .cover .ic ha-icon { --mdc-icon-size:40px; color:var(--acc); opacity:.9; }
+.tile .speel { position:absolute; right:8px; bottom:8px; width:40px; height:40px; border-radius:50%;
+               display:flex; align-items:center; justify-content:center; background:var(--grad);
+               color:#fff; box-shadow:0 6px 16px rgba(0,0,0,.4); opacity:.92;
+               transition:transform .15s ease, opacity .15s ease; }
+.tile.rond .speel { right:12%; bottom:12%; }
+.tile .speel ha-icon { --mdc-icon-size:24px; }
+.tile .speel:active { transform:scale(.88); }
+.tile:active .cover { transform:scale(.97); }
+@media (hover:hover) {
+  .tile .speel { opacity:0; transform:translateY(6px); }
+  .tile:hover .speel { opacity:1; transform:none; }
+  .tile:hover .cover { transform:translateY(-2px); box-shadow:0 14px 30px rgba(0,0,0,.38); }
+}
+.tile .tt { font-size:13.5px; font-weight:650; padding-top:9px; line-height:1.25;
+            color:var(--primary-text-color,#e9e9ea);
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tile .st { font-size:12px; color:var(--flauw); padding-top:2px; line-height:1.25;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tile.rond .tt, .tile.rond .st { text-align:center; }
+
+/* loading placeholders */
+@keyframes glans { from { background-position:-200px 0; } to { background-position:calc(200px + 100%) 0; } }
+.skelet .cover, .skelet .tt, .skelet .st, .skelet-txt, .held.skelet {
+  background:linear-gradient(90deg,var(--ov1) 0,var(--ov2) 50%,var(--ov1) 100%) no-repeat;
+  background-size:200px 100%; background-color:var(--ov1); animation:glans 1.3s ease-in-out infinite;
+  box-shadow:none; }
+.skelet .tt { height:13px; width:80%; margin-top:10px; padding:0; border-radius:6px; }
+.skelet .st { height:11px; width:50%; margin-top:6px; padding:0; border-radius:6px; }
+.skelet-txt { height:18px; width:180px; border-radius:8px; }
+
+/* discover: featured pick + one carousel per recommendation row */
+.ontdek { min-height:0; height:100%; overflow-y:auto; overflow-x:hidden; scrollbar-width:none;
+          display:flex; flex-direction:column; gap:22px; padding:4px 2px 16px; }
+.ontdek::-webkit-scrollbar { display:none; }
+.held { position:relative; flex:0 0 auto; display:flex; align-items:center; gap:22px; min-height:184px;
+        padding:20px; border-radius:20px; overflow:hidden; isolation:isolate;
+        background:var(--ov1); box-shadow:inset 0 0 0 1px var(--line); }
+.held-bg { position:absolute; inset:-40px; z-index:-1; background-size:cover; background-position:center;
+           filter:blur(36px) saturate(1.4) brightness(.55); transform:scale(1.15); }
+.held::after { content:''; position:absolute; inset:0; z-index:-1;
+               background:linear-gradient(90deg,rgba(0,0,0,.35),rgba(0,0,0,.05)); }
+.held-art { flex:0 0 auto; width:144px; height:144px; border-radius:14px; overflow:hidden;
+            box-shadow:0 14px 34px rgba(0,0,0,.5); }
+.held-art img { width:100%; height:100%; object-fit:cover; display:block; }
+.held-tx { min-width:0; flex:1 1 auto; color:#fff; }
+.held-eyebrow { display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:700;
+                letter-spacing:.8px; text-transform:uppercase; color:rgba(255,255,255,.75);
+                white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.held-eyebrow ha-icon { --mdc-icon-size:16px; }
+.held-titel { font-size:30px; font-weight:800; letter-spacing:-.5px; line-height:1.1; margin-top:8px;
+              display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.held-sub { font-size:14px; color:rgba(255,255,255,.75); margin-top:6px;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.held-knoppen { display:flex; gap:10px; margin-top:16px; align-items:center; }
+.knop { display:inline-flex; align-items:center; gap:8px; height:46px; padding:0 22px; border-radius:999px;
+        background:rgba(255,255,255,.14); color:#fff; font-size:15px; font-weight:700; }
+.knop ha-icon { --mdc-icon-size:22px; }
+.knop.hoofd { background:var(--grad); box-shadow:0 8px 22px var(--acc-glow); }
+.knop.rond { width:46px; padding:0; justify-content:center; }
+.ok-rij { flex:0 0 auto; min-width:0; }
+.ok-kop { display:flex; align-items:center; gap:10px; margin-bottom:10px; min-height:36px; }
+.ok-ic { width:32px; height:32px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+         background:var(--ov2); color:var(--acc); flex:0 0 auto; }
+.ok-ic ha-icon { --mdc-icon-size:18px; }
+.ok-titel { flex:1 1 auto; min-width:0; font-size:19px; font-weight:750; letter-spacing:-.2px;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ok-titel small { display:block; font-size:12px; font-weight:500; color:var(--flauw); letter-spacing:0; }
+.ok-nav { display:flex; gap:6px; flex:0 0 auto; }
+.ok-nav button { width:36px; height:36px; border-radius:50%; background:var(--ov1); color:var(--zacht);
+                 display:flex; align-items:center; justify-content:center; }
+.ok-nav ha-icon { --mdc-icon-size:22px; }
+.carrousel { --kw:150px; display:grid; grid-auto-flow:column; grid-auto-columns:var(--kw); gap:16px;
+             overflow-x:auto; overflow-y:hidden; scroll-snap-type:x proximity; scrollbar-width:none;
+             padding:2px 2px 6px; overscroll-behavior-x:contain; }
+.carrousel::-webkit-scrollbar { display:none; }
+.carrousel > .tile { scroll-snap-align:start; }
+@container rechts (max-width: 600px) { .carrousel { --kw:118px; gap:12px; } .held-art { width:104px; height:104px; } .held-titel { font-size:22px; } }
+@container rechts (min-width: 1000px) { .carrousel { --kw:176px; gap:20px; } .held-art { width:168px; height:168px; } }
+@container rechts (min-width: 1300px) { .carrousel { --kw:204px; gap:22px; } .held-art { width:196px; height:196px; } .held-titel { font-size:38px; } }
+.leeg-groot { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+              text-align:center; flex:1 1 auto; font-size:15px; padding:40px 20px; }
+.leeg-groot ha-icon { --mdc-icon-size:48px; color:var(--acc); }
+.leeg-groot .knop { color:var(--primary-text-color,#fff); background:var(--ov2); }
 
 .lijst { min-height:0; max-width:100%; height:100%; overflow-y:auto; overflow-x:hidden;
          display:flex; flex-direction:column; padding-top:2px; scrollbar-width:none; }
@@ -208,18 +301,36 @@ ha-icon { pointer-events:none; }
                 font-size:12px; font-weight:600; }
 .links ha-icon { --mdc-icon-size:15px; }
 
+/* ambient light: the current artwork, heavily blurred, tints the whole card */
+.wrap { position:relative; isolation:isolate; }
+.wrap::before { content:''; position:absolute; inset:-80px; z-index:-1; pointer-events:none;
+                background-image:var(--art,none); background-size:cover; background-position:left center;
+                filter:blur(70px) saturate(1.5); opacity:0; transition:opacity .6s ease; }
+.wrap.met-art::before { opacity:.28; }
+:host(.licht) .wrap.met-art::before { opacity:.18; }
+
+/* tabs scroll sideways instead of being cut off */
+.chips { overflow-x:auto; overflow-y:hidden; scrollbar-width:none; }
+.chips::-webkit-scrollbar { display:none; }
+.chips button.ontdektab { display:flex; align-items:center; gap:6px; flex:0 0 auto; }
+.chips button.ontdektab ha-icon { --mdc-icon-size:18px; }
+
+.kop .kop-art { width:40px; height:40px; border-radius:8px; object-fit:cover; flex:0 0 auto;
+                box-shadow:0 4px 12px rgba(0,0,0,.35); }
+.kop .alles { display:flex; align-items:center; gap:4px; }
+.kop .alles ha-icon { --mdc-icon-size:18px; }
+.rij .nr { justify-self:center; font-size:12.5px; color:var(--flauw); font-variant-numeric:tabular-nums; }
+
 /* Smaller than a 1024x600 panel - a phone, a narrow column, or the preview
    pane of the card editor. Zonder dit wordt de rechterkolom onleesbaar smal. */
-@container (max-width: 940px) {
+@container kaart (max-width: 940px) {
   .wrap { grid-template-columns:250px 1px minmax(0,1fr); gap:14px; padding:14px; }
-  .tiles { grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px 10px; }
   .np .art, .np .leegart { width:140px; height:140px; }
   .np .glow { width:150px; height:150px; }
   .chips { gap:14px; }
 }
-@container (max-width: 780px) {
+@container kaart (max-width: 780px) {
   .wrap { grid-template-columns:210px 1px minmax(0,1fr); }
-  .tiles { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .np .art, .np .leegart { width:118px; height:118px; }
   .np .ctr { gap:8px; }
   .kbd button { height:38px; font-size:15px; }
@@ -228,7 +339,7 @@ ha-icon { pointer-events:none; }
    two columns here: the whole point of the preview is seeing the thing you are
    configuring, and a stacked version is not that thing. So squeeze rather than
    rearrange - a narrower left column, smaller artwork, tighter controls. */
-@container (max-width: 560px) {
+@container kaart (max-width: 560px) {
   .wrap { grid-template-columns:150px 1px minmax(0,1fr); gap:10px; padding:12px; }
   .np { padding:8px 0 2px; }
   .np .art, .np .leegart { width:104px; height:104px; }
@@ -246,12 +357,11 @@ ha-icon { pointer-events:none; }
   .volrow .vollbl { min-width:28px; font-size:11px; }
   .chips { gap:10px; }
   .chips button { font-size:12px; }
-  .tiles { gap:9px 8px; }
 }
 /* Genuinely narrow - a phone in portrait, or a one-column dashboard. Two
    columns stop being readable here, so stack them. Never hide one: on the
    card's own dashboard that half is the reason the card exists. */
-@container (max-width: 400px) {
+@container kaart (max-width: 400px) {
   .wrap { grid-template-columns:minmax(0,1fr); height:auto;
           min-height:var(--mc-h,556px); row-gap:14px; padding:14px; }
   .scheiding { display:none; }
@@ -283,6 +393,8 @@ export class MusicAssistantTouchCard extends HTMLElement {
     this._beeld = {};      // uri -> the cover Music Assistant has right now
     this._bron = {};       // source key -> { tijd, items }
     this._bezigBron = {};  // source key -> in-flight promise, so two draws fetch once
+    this._ontdek = null;   // { sleutel, tijd, rows } of the discover feed
+    this._ontdekBezig = null;
   }
 
   connectedCallback() {
@@ -337,6 +449,60 @@ export class MusicAssistantTouchCard extends HTMLElement {
     this._schermtoetsen = config.keyboard !== false;
     this._kbd = this._schermtoetsen;
     this._zones = null;
+    const ontdekWas = this._discover;
+    this._discover = config.discover !== false;
+    if (ontdekWas === undefined || ontdekWas !== this._discover) {
+      this._mode = this._discover ? 'ontdek' : 'home';
+    }
+  }
+
+  // ---------- discover ----------
+  // Music Assistant's own recommendation rows, fetched on behalf of the
+  // selected music source so every person gets their own feed.
+  _ontdekSleutel() { return `${this._cfg.config_entry_id}|${this._user() || ''}`; }
+
+  _ontdekHaal(force) {
+    if (!this._hass || !this._cfg || !this._discover) return Promise.resolve();
+    const sleutel = this._ontdekSleutel();
+    const c = this._ontdek;
+    if (!force && c && c.sleutel === sleutel && Date.now() - c.tijd < BIB_TTL) return Promise.resolve();
+    if (this._ontdekBezig && this._ontdekBezig.sleutel === sleutel) return this._ontdekBezig.p;
+    const generation = this._sourceGeneration;
+    const data = { config_entry_id: this._cfg.config_entry_id, row_limit: 20 };
+    if (this._user()) data.username = this._user();
+    const p = this._ws({
+      type: 'call_service', domain: DOMAIN, service: 'get_recommendations',
+      service_data: data, return_response: true,
+    }).then((r) => {
+      const rows = (r && r.response && r.response.rows) || [];
+      if (generation !== this._sourceGeneration) return;
+      for (const row of rows) this._onthoudBeeld(row.items);
+      this._ontdek = { sleutel, tijd: Date.now(), rows };
+    }).catch((error) => {
+      if (generation !== this._sourceGeneration) return;
+      this._ontdek = { sleutel, tijd: Date.now(), rows: [], fout: true };
+      this._fout(error);
+    }).finally(() => {
+      if (this._ontdekBezig && this._ontdekBezig.p === p) this._ontdekBezig = null;
+      if (this.isConnected && this._mode === 'ontdek'
+        && generation === this._sourceGeneration) this._tekenRechts();
+    });
+    this._ontdekBezig = { sleutel, p };
+    return p;
+  }
+
+  _rijNaam(row) {
+    const t = this._taal();
+    const naam = String(row.name || '');
+    const sleutel = String(row.translation_key || '').replace(/_/g, ' ').toLowerCase();
+    return t.rijNamen[naam.toLowerCase()] || t.rijNamen[sleutel] || naam;
+  }
+
+  _ondertitel(it) {
+    const t = this._taal();
+    const soort = it.media_type || SOORT_VAN(it.uri);
+    const type = t.type1[soort] || '';
+    return [type, it.artist].filter(Boolean).join(' · ');
   }
 
   _sourceStorageKey() {
@@ -475,6 +641,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
   // Work out what is still missing and fetch it, once, in parallel.
   _vulAan() {
     if (!this._hass || !this._cfg || !this._cfg.config_entry_id) return;
+    if (this._mode === 'ontdek') this._ontdekHaal();
     const generation = this._sourceGeneration;
     const soorten = new Set();
     const taken = [];
@@ -997,14 +1164,11 @@ export class MusicAssistantTouchCard extends HTMLElement {
     this._tekenRechts();
     clearInterval(this._tikTimer);
     this._tikTimer = setInterval(() => {
-      this._toonVoortgang(); this._vulHoogte(); this._pasTegels(); this._toonRail();
+      this._toonVoortgang(); this._vulHoogte(); this._toonRail();
     }, 1000);
     if (vul) requestAnimationFrame(() => this._vulHoogte());
     if (!this._maatLuister) {
-      this._maatLuister = () => {
-        this._vulHoogte();
-        this._pasTegels();
-      };
+      this._maatLuister = () => this._vulHoogte();
       window.addEventListener('resize', this._maatLuister);
     }
     this.shadowRoot.addEventListener('click', (ev) => this._klik(ev));
@@ -1124,12 +1288,14 @@ export class MusicAssistantTouchCard extends HTMLElement {
     this._bron = {};
     this._bezigBron = {};
     this._beeld = {};
+    this._ontdek = null;
+    this._ontdekBezig = null;
     this._res = [];
     this._det = [];
     this._detUri = '';
     this._detTitel = '';
     this._q = '';
-    this._mode = 'home';
+    this._mode = this._discover ? 'ontdek' : 'home';
     this._tekenSources();
     this._tekenRechts();
     this._vulAan();
@@ -1184,6 +1350,24 @@ export class MusicAssistantTouchCard extends HTMLElement {
     }
     else if (a === 'naarzoek') { this._mode = 'zoek'; this._kbd = this._schermtoetsen; this._tekenRechts(); }
     else if (a === 'home') { this._mode = 'home'; this._tekenRechts(); }
+    else if (a === 'ontdek') { this._mode = 'ontdek'; this._tekenRechts(); this._ontdekHaal(); }
+    else if (a === 'okvernieuw') { this._ontdekHaal(true); this._tekenRechts(); }
+    else if (a === 'ok' || a === 'okspeel') {
+      const row = ((this._ontdek && this._ontdek.rows) || [])[parseInt(t.dataset.r, 10)];
+      const it = row && row.items[i];
+      if (!it) return;
+      const soort = it.media_type || SOORT_VAN(it.uri);
+      if (a === 'okspeel' || soort === 'track' || soort === 'radio') this._speel(it.uri, false, t);
+      else this._open({ name: it.name, uri: it.uri }, t, 'ontdek');
+    }
+    else if (a === 'okrol') {
+      const rij = this.shadowRoot.getElementById(`okrij${t.dataset.r}`);
+      if (rij) rij.scrollBy({ left: parseInt(t.dataset.d, 10) * rij.clientWidth * 0.85, behavior: 'smooth' });
+    }
+    else if (a === 'tegelspeel') {
+      const tl = this._tegelsVan(this._cats[this._cat])[i];
+      if (tl) this._speel(tl.uri, tl.radio_mode, t);
+    }
     else if (a === 'cat') { this._cat = i; this._mode = 'home'; this._tekenRechts(); }
     else if (a === 'soort') { this._soort = i; if (this._q.trim()) this._zoek(); else this._tekenRechts(); }
     else if (a === 'kbd') { this._kbd = !this._kbd; this._tekenRechts(); }
@@ -1197,6 +1381,10 @@ export class MusicAssistantTouchCard extends HTMLElement {
       const direct = tl.play === true || this._cfg.tile_action === 'play';
       if (direct) this._speel(tl.uri, tl.radio_mode, t);
       else this._open({ name: tl.name, uri: tl.uri }, t, 'home');
+    }
+    else if (a === 'resspeel') {
+      const it = this._res[i];
+      if (it) this._speel(it.uri || it.media_content_id, false, t);
     }
     else if (a === 'res') {
       const it = this._res[i];
@@ -1254,30 +1442,6 @@ export class MusicAssistantTouchCard extends HTMLElement {
     if (h === this._vulH && wrap.style.getPropertyValue('--mc-h') === hoogte) return;
     this._vulH = h;
     wrap.style.setProperty('--mc-h', hoogte);
-  }
-
-  // Fit thumbnails to cell width and height; extra rows remain scrollable.
-  _pasTegels() {
-    const vak = this.shadowRoot && this.shadowRoot.querySelector('.tiles.vlak');
-    if (!vak || !vak.clientHeight || !vak.children.length) return;
-    const firstTile = vak.firstElementChild;
-    const label = firstTile && firstTile.querySelector('span');
-    const labelHeight = label ? label.getBoundingClientRect().height : 0;
-    const style = getComputedStyle(vak);
-    const kolommen = (style.gridTemplateColumns || '').split(' ').filter(Boolean).length || 1;
-    const rijTussenruimte = Number.parseFloat(style.rowGap) || 0;
-    const rijen = Math.ceil(vak.children.length / kolommen);
-    const zichtbareRijen = Math.min(rijen, 3);
-    const hoogtePerRij = (vak.clientHeight - rijTussenruimte * (zichtbareRijen - 1)) / zichtbareRijen;
-    const breedte = firstTile ? firstTile.getBoundingClientRect().width : vak.clientWidth / kolommen;
-    const voorstel = Math.min(108, breedte, hoogtePerRij - labelHeight);
-    const grootte = Math.max(64, Math.floor(voorstel / 4) * 4);
-    const sleutel = [vak.children.length, vak.clientHeight, Math.round(vak.clientWidth),
-      kolommen, Math.round(rijTussenruimte), Math.round(labelHeight), grootte].join('x');
-    if (sleutel === this._tegelSleutel) return;
-    this._tegelSleutel = sleutel;
-    if (grootte >= 108) vak.style.removeProperty('--tw');
-    else vak.style.setProperty('--tw', `${grootte}px`);
   }
 
   // Vinger op de scrollbalk: de duim volgt en de lijst schuift mee.
@@ -1339,47 +1503,127 @@ export class MusicAssistantTouchCard extends HTMLElement {
   _tekenRechts() {
     const el = this.shadowRoot.getElementById('right');
     if (!el) return;
-    if (this._mode === 'home') el.innerHTML = this._homeHtml();
+    if (this._mode === 'ontdek' && this._discover) el.innerHTML = this._ontdekHtml();
+    else if (this._mode === 'home' || this._mode === 'ontdek') el.innerHTML = this._homeHtml();
     else if (this._mode === 'detail') el.innerHTML = this._detailHtml();
     else el.innerHTML = this._zoekHtml();
-    this._tegelSleutel = null;
-    requestAnimationFrame(() => { this._pasTegels(); this._toonRail(); });
+    requestAnimationFrame(() => this._toonRail());
+  }
+
+  // One tile: square cover (round for an artist), a play button on the cover
+  // and two lines of text underneath. Every grid and carousel uses this.
+  _tegelHtml({ act, speelAct, i, r, uri, naam, sub, beeld, icon }) {
+    const soort = SOORT_VAN(uri);
+    const ic = `<div class="ic">${svg(icon || (soort === 'radio' ? 'radio' : soort === 'artist' ? 'artiest' : 'muziek'))}</div>`;
+    // An image that will not load (a site that refuses hotlinking, a dead
+    // link) falls back to the icon instead of leaving a broken picture.
+    const img = beeld
+      ? `<img loading="lazy" alt="" src="${esc(GROOT(beeld))}" onerror="this.outerHTML=this.nextElementSibling.innerHTML"><template>${ic}</template>`
+      : ic;
+    const data = `data-i="${i}"${r != null ? ` data-r="${r}"` : ''}`;
+    const speel = speelAct
+      ? `<span class="speel" data-act="${speelAct}" ${data} title="${esc(this._taal().luister)}">${svg('play')}</span>`
+      : '';
+    return `<button class="tile${soort === 'artist' ? ' rond' : ''}" data-act="${act}" ${data}>
+      <div class="cover">${img}${speel}</div>
+      <div class="tt">${esc(naam)}</div>${sub ? `<div class="st">${esc(sub)}</div>` : ''}</button>`;
+  }
+
+  _skeletHtml(aantal, carrousel) {
+    const kaart = '<div class="tile skelet"><div class="cover"></div><div class="tt"></div><div class="st"></div></div>';
+    const n = Array.from({ length: aantal }, () => kaart).join('');
+    return carrousel ? `<div class="carrousel">${n}</div>` : `<div class="tiles">${n}</div>`;
   }
 
   _homeHtml() {
     const cats = this._cats;
-    if (!cats.length) return `<div class="leeg">${this._taal().geenCats}</div>`;
-    const chips = this._tabsHtml(false);
+    const chips = this._tabsHtml();
+    if (!cats.length) return chips + `<div class="leeg">${this._taal().geenCats}</div>`;
     const cat = cats[this._cat] || {};
     const lijst = this._tegelsVan(cat);
-    // A source category has nothing to show until its fetch lands. Say so
-    // rather than drawing an empty grid that looks like a broken category.
+    // A source category has nothing to show until its fetch lands: show the
+    // shape of what is coming rather than an empty grid.
     if (cat.source && !lijst.length) {
-      return chips + `<div class="leeg">${this._taal().bezigOphalen}</div>`;
+      const c = this._bron[this._bronSleutel(cat.source)];
+      return chips + (c ? `<div class="leeg">${this._taal().geenResultaat}</div>`
+        : this._scrollbox(`<div class="vlak">${this._skeletHtml(10)}</div>`));
     }
-    const tiles = lijst.map((t, i) => {
-      const b = this._tegelBeeld(t);
-      const ic = `<div class="ic">${svg(t.icon || (SOORT_VAN(t.uri) === 'radio' ? 'radio' : 'muziek'))}</div>`;
-      // An image that will not load (a site that refuses hotlinking, a dead
-      // link) falls back to the icon instead of leaving a broken picture.
-      const beeld = b
-        ? `<img loading="lazy" src="${esc(GROOT(b))}" onerror="this.outerHTML=this.nextElementSibling.innerHTML"><template>${ic}</template>`
-        : ic;
-      const reason = t.recommendation_reason
-        ? `<small class="reason">${esc(t.recommendation_reason)}</small>`
-        : '';
-      return `<button class="tile" data-act="tegel" data-i="${i}">${beeld}${reason}<span>${esc(t.name)}</span></button>`;
-    }).join('');
+    const tiles = lijst.map((t, i) => this._tegelHtml({
+      act: 'tegel', speelAct: 'tegelspeel', i, uri: t.uri, naam: t.name,
+      sub: t.recommendation_reason || this._ondertitel({ uri: t.uri }),
+      beeld: this._tegelBeeld(t), icon: t.icon,
+    })).join('');
     return chips + this._scrollbox(`<div class="tiles vlak">${tiles}</div>`);
   }
 
-  // De categorietabs, met de zoekknop als laatste tab rechts.
-  _tabsHtml(zoekt) {
+  // The discover feed: a featured pick on top, then one carousel per
+  // Music Assistant recommendation row.
+  _ontdekHtml() {
+    const t = this._taal();
+    const chips = this._tabsHtml();
+    const c = this._ontdek && this._ontdek.sleutel === this._ontdekSleutel() ? this._ontdek : null;
+    if (!c) {
+      const skelet = [0, 1].map(() => `<section class="ok-rij"><div class="ok-kop"><div class="ok-titel skelet-txt"></div></div>${this._skeletHtml(8, true)}</section>`).join('');
+      return chips + this._scrollbox(`<div class="ontdek vlak"><div class="held skelet"></div>${skelet}</div>`);
+    }
+    if (!c.rows.length) {
+      return chips + `<div class="leeg leeg-groot">${svg('ontdek')}<div>${esc(t.ontdekLeeg)}</div>
+        <button class="knop" data-act="okvernieuw">${svg('vernieuw')} ${esc(t.opnieuw)}</button></div>`;
+    }
+    let held = '';
+    let heldR = -1;
+    let heldI = -1;
+    for (let r = 0; r < c.rows.length && heldR < 0; r++) {
+      const i = c.rows[r].items.findIndex((it) => VEILIG(it.image) && SOORT_VAN(it.uri) !== 'track');
+      if (i >= 0) { heldR = r; heldI = i; }
+    }
+    if (heldR >= 0) {
+      const it = c.rows[heldR].items[heldI];
+      const beeld = esc(GROOT(VEILIG(it.image)));
+      held = `<div class="held">
+        <div class="held-bg" style="background-image:url('${beeld}')"></div>
+        <button class="held-art" data-act="ok" data-r="${heldR}" data-i="${heldI}"><img alt="" src="${beeld}"></button>
+        <div class="held-tx">
+          <div class="held-eyebrow">${svg('ontdek')} ${esc(t.ontdekKop)} · ${esc(this._rijNaam(c.rows[heldR]))}</div>
+          <div class="held-titel">${esc(it.name)}</div>
+          <div class="held-sub">${esc(this._ondertitel(it))}</div>
+          <div class="held-knoppen">
+            <button class="knop hoofd" data-act="okspeel" data-r="${heldR}" data-i="${heldI}">${svg('play')} ${esc(t.luister)}</button>
+            <button class="knop rond" data-act="okvernieuw" title="${esc(t.opnieuw)}">${svg('vernieuw')}</button>
+          </div>
+        </div></div>`;
+    }
+    const pijlen = this._cfg.arrows !== false;
+    const rijen = c.rows.map((row, r) => {
+      const kaarten = row.items.map((it, i) => this._tegelHtml({
+        act: 'ok', speelAct: 'okspeel', i, r, uri: it.uri, naam: it.name,
+        sub: this._ondertitel(it), beeld: VEILIG(it.image),
+      })).join('');
+      const nav = pijlen && row.items.length > 3 ? `<div class="ok-nav">
+          <button data-act="okrol" data-r="${r}" data-d="-1">${svg('links')}</button>
+          <button data-act="okrol" data-r="${r}" data-d="1">${svg('rechts')}</button></div>` : '';
+      return `<section class="ok-rij">
+        <div class="ok-kop">
+          ${row.icon ? `<span class="ok-ic">${svg(row.icon.indexOf(':') > 0 ? row.icon : `mdi:${row.icon}`)}</span>` : ''}
+          <div class="ok-titel">${esc(this._rijNaam(row))}${row.subtitle ? `<small>${esc(row.subtitle)}</small>` : ''}</div>
+          ${nav}
+        </div>
+        <div class="carrousel" id="okrij${r}">${kaarten}</div></section>`;
+    }).join('');
+    return chips + this._scrollbox(`<div class="ontdek vlak">${held}${rijen}</div>`);
+  }
+
+  // The tabs: discover first, then the categories, the search button last.
+  _tabsHtml() {
+    const t = this._taal();
+    const ontdek = this._discover
+      ? `<button class="ontdektab${this._mode === 'ontdek' ? ' on' : ''}" data-act="ontdek">${svg('ontdek')}<span>${esc(t.ontdek)}</span></button>`
+      : '';
     const tabs = this._cats.map((c, i) =>
-      `<button class="${!zoekt && i === this._cat ? 'on' : ''}" data-act="cat" data-i="${i}">${esc(c.name)}</button>`).join('');
-    return `<div class="chips">${tabs}
-      <button class="zoektab${zoekt ? ' on' : ''}" data-act="naarzoek"
-              title="${esc(this._taal().zoek)}">${svg('zoek')}</button></div>`;
+      `<button class="${this._mode === 'home' && i === this._cat ? 'on' : ''}" data-act="cat" data-i="${i}">${esc(c.name)}</button>`).join('');
+    return `<div class="chips">${ontdek}${tabs}
+      <button class="zoektab${this._mode === 'zoek' ? ' on' : ''}" data-act="naarzoek"
+              title="${esc(t.zoek)}">${svg('zoek')}</button></div>`;
   }
 
   _zoekHtml() {
@@ -1433,10 +1677,10 @@ export class MusicAssistantTouchCard extends HTMLElement {
     }
     const tiles = this._res.map((it, i) => {
       const art = (it.artists && it.artists[0] && it.artists[0].name) || '';
-      const bi = VEILIG(it.image);
-      const beeld = bi ? `<img loading="lazy" src="${esc(GROOT(bi))}">` : '<div class="ph"></div>';
-      return `<button class="tile" data-act="res" data-i="${i}">${beeld}
-        <span>${esc(it.name)}${art ? ' &middot; ' + esc(art) : ''}</span></button>`;
+      return this._tegelHtml({
+        act: 'res', speelAct: 'resspeel', i, uri: it.uri || it.media_content_id,
+        naam: it.name, sub: art || this._ondertitel({ uri: it.uri }), beeld: VEILIG(it.image),
+      });
     }).join('');
     return this._scrollbox(`<div class="tiles vlak">${tiles}</div>`);
   }
@@ -1452,14 +1696,16 @@ export class MusicAssistantTouchCard extends HTMLElement {
       : ` · ${min} ${t.minuut}`) : '';
     const telling = (this._bezig || !n) ? ''
       : `<span class="aantal">${n} ${n === 1 ? t.nummer : t.nummers}${extra}</span>`;
+    const hoes = VEILIG(this._beeld[this._detUri]);
     const kop = `<div class="kop">
-      <button class="terug" data-act="terug">${svg('terug')} ${this._terug === 'home' ? t.terug : t.resultaten}</button>
+      <button class="terug" data-act="terug">${svg('terug')} ${this._terug === 'zoek' ? t.resultaten : t.terug}</button>
+      ${hoes ? `<img class="kop-art" alt="" src="${esc(KLEIN(hoes))}">` : ''}
       <div class="titel">${esc(this._detTitel)}${telling}</div>
-      <button class="alles" data-act="alles">${t.speelAlles}</button></div>`;
+      <button class="alles" data-act="alles">${svg('play')} ${t.speelAlles}</button></div>`;
     if (this._bezig) return kop + `<div class="leeg">${t.bezigOphalen}</div>`;
     if (!n) return kop + `<div class="leeg">${t.geenNummers}</div>`;
     const rijen = this._det.map((d, i) => {
-      const img = d.thumbnail ? `<img loading="lazy" src="${esc(KLEIN(d.thumbnail))}">` : '<span></span>';
+      const img = d.thumbnail ? `<img loading="lazy" src="${esc(KLEIN(d.thumbnail))}">` : `<span class="nr">${i + 1}</span>`;
       return `<button class="rij" data-act="det" data-i="${i}">${img}
         <div class="tx"><b>${esc(d.title)}</b></div>
         <span class="du">${mmss(d.media_duration)}</span></button>`;
@@ -1615,8 +1861,13 @@ export class MusicAssistantTouchCard extends HTMLElement {
     const elders = (ent && ent !== eigen && s && SPEELT.includes(s.state))
       ? `<div class="op">${t.speeltOp} ${esc(a.friendly_name || ent)}</div>` : '';
     const duur = parseInt(a.media_duration, 10) || 0;
+    const wrap = sr.querySelector('.wrap');
+    if (wrap) {
+      const veilig = VEILIG(pic);
+      wrap.style.setProperty('--art', veilig ? `url("${veilig.replace(/["\\\n\r]/g, '')}")` : 'none');
+      wrap.classList.toggle('met-art', !!veilig);
+    }
     np.innerHTML = `
-      ${pic ? `<div class="glow" style="background-image:url('${esc(pic)}')"></div>` : ''}
       ${pic ? `<img class="art" src="${esc(pic)}">`
             : `<div class="leegart">${svg('muziek')}</div>`}
       <div class="tx">
