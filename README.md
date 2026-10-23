@@ -281,6 +281,20 @@ response_variable: discover
 
 Returns `rows`, each with `id`, `name`, `translation_key`, `subtitle`, `icon`, `source` (`similar` or `music_assistant`), `seed` (artist, for *because you listen to* rows) and `items` (same fields as above). Used by the *Discover* tab. When the Music Assistant server rejects the `username` argument, the feed of the account Home Assistant is connected with is returned instead.
 
+### `kiosk_musicassistant_cards.get_queue_items`
+
+```yaml
+action: kiosk_musicassistant_cards.get_queue_items
+data:
+  config_entry_id: <your_music_assistant_config_entry_id>
+  queue_id: media_player.living_room   # the player's active_queue attribute
+  offset: 40   # optional, default: two items before the current track
+  limit: 25    # optional, 1-100 (default 50)
+response_variable: queue
+```
+
+Returns `queue_id`, `current_index`, `total`, `offset` and `items` (`index`, `queue_item_id`, `name`, `artist`, `image`, `duration`). The now-playing card uses it for its queue panel: it opens on the current track with two pages loaded and fetches 25 more items whenever the list is scrolled near either end.
+
 ## Finding the Music Assistant `config_entry_id`
 
 In the card editor, pick Music Assistant from the drop-down. In YAML, open **Settings > Devices & services > Music Assistant**; the id is the last part of the URL of the integration entry, or use the drop-down of the `config_entry_id` field in **Developer tools > Actions**.

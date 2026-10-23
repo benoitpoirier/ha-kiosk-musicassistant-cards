@@ -2,6 +2,7 @@ import { VEILIG, VOL_CSS, esc, svg, taalVan, volBind, volHtml, volShow } from '.
 import { THEME_COLORS } from './kiosk-theme.js';
 
 const DOMAIN = 'kiosk_musicassistant_cards';
+const QUEUE_PAGE = 25;
 
 const NOW_PLAYING_STYLE = `
 :host { display:block; width:100%; color:#fff; container-type:inline-size; container-name:np;
@@ -54,11 +55,14 @@ ha-icon { pointer-events:none; }
 .pane-head .close { margin-left:auto; width:40px; height:40px; border-radius:50%; display:grid; place-items:center;
   background:rgba(255,255,255,.1); }
 .pane-head .close ha-icon { color:#fff; }
-.q-list { flex:1; overflow:auto; scrollbar-width:none; padding:0 12px 12px; }
-.q-row { display:grid; grid-template-columns:64px minmax(0,1fr); gap:14px; align-items:center;
+.q-list { flex:1; overflow:auto; scrollbar-width:none; padding:0 12px 12px; overscroll-behavior:contain; }
+.q-row { display:grid; grid-template-columns:56px minmax(0,1fr) auto; gap:14px; align-items:center;
   padding:10px; border-radius:16px; }
 .q-row.now { background:rgba(255,255,255,.09); }
-.q-row img,.q-ph { width:64px; height:64px; border-radius:10px; object-fit:cover; }
+.q-row img,.q-ph { width:56px; height:56px; border-radius:10px; object-fit:cover; }
+.q-row.played { opacity:.5; }
+.q-dur { font-size:13px; color:rgba(255,255,255,.55); font-variant-numeric:tabular-nums; padding-right:4px; }
+.q-more[hidden] { display:none; }
 .q-ph { display:grid; place-items:center; background:rgba(255,255,255,.08); color:rgba(255,255,255,.5); }
 .q-tx { min-width:0; }
 .q-label { font-size:11px; font-weight:800; letter-spacing:.8px; text-transform:uppercase; color:var(--np-acc); }
@@ -165,12 +169,10 @@ export class KioskNowPlayingCard extends HTMLElement {
     this.attachShadow({ mode: 'open' });
     this._selected = null;
     this._signature = '';
-    this._queue = [];
-    this._queueTotal = 0;
+    this._qs = null;
     this._queueContextKey = '';
     this._queueContext = null;
     this._queueOpen = false;
-    this._queueBusy = false;
     this._notice = '';
     this._lyricsLines = [];
     this._lyricsAvailable = false;
@@ -273,6 +275,9 @@ export class KioskNowPlayingCard extends HTMLElement {
         <div class="notice" id="notice"></div>
       </section>`;
     this.shadowRoot.addEventListener('click', (event) => this._click(event));
+    this.shadowRoot.addEventListener('scroll', (event) => {
+      if (event.target && event.target.id === 'q-list') this._queueScroll();
+    }, true);
     volBind(this.shadowRoot, {
       step: () => this._volumeStep(),
       send: (percent) => {
@@ -383,6 +388,8 @@ export class KioskNowPlayingCard extends HTMLElement {
       this._lyricsVisible = false;
       this._activeLyricIndex = -1;
       if (queueContextKey) this._loadQueueContext(entity, queueContextKey);
+      // A new track: reopen the list on it.
+      if (this._queueOpen && queueContextKey) Promise.resolve().then(() => this._loadQueue());
     }
     const picture = VEILIG(attributes.entity_picture_local || attributes.entity_picture || '');
     const signature = [entity, state && state.state, attributes.media_title, attributes.media_artist,
@@ -398,7 +405,8 @@ export class KioskNowPlayingCard extends HTMLElement {
         const current = this._state(player.entity);
         return `${player.entity}:${current ? current.state : ''}`;
       }).join(','),
-      this._queueOpen, this._queueBusy, this._notice].join('|');
+      this._queueOpen, this._qs && this._qs.generation, this._qs && this._qs.loading === 'all',
+      this._qs && this._qs.items.length > 0, this._notice].join('|');
     if (signature !== this._signature) {
       this._signature = signature;
       this._render(state, attributes, picture);
@@ -413,25 +421,126 @@ export class KioskNowPlayingCard extends HTMLElement {
     return `--np-acc:${colors.acc};--np-acc2:${colors.acc2};`;
   }
 
+  // ---------- queue ----------
+  // The list opens on the current track with two pages (50 items) loaded; the
+  // rest is fetched a page at a time when the list is scrolled near either end.
+  // Rows are added to the DOM in place, so the scroll position never jumps.
+  _queueRowHtml(item, t) {
+    const current = this._qs && item.index === this._qs.current;
+    const played = this._qs && this._qs.current != null && item.index < this._qs.current;
+    const image = VEILIG(item.image || '');
+    return `<div class="q-row${current ? ' now' : ''}${played ? ' played' : ''}" data-q="${item.index}">
+      ${image ? `<img alt="" loading="lazy" src="${esc(image)}">` : `<span class="q-ph">${svg('mdi:music')}</span>`}
+      <div class="q-tx">${current ? `<div class="q-label">${esc(t.nowLabel)}</div>` : ''}
+        <div class="q-name">${esc(item.name || t.track)}</div>${item.artist ? `<div class="q-art">${esc(item.artist)}</div>` : ''}</div>
+      <span class="q-dur">${item.duration ? this._time(item.duration) : ''}</span></div>`;
+  }
+
   _queueHtml(t) {
-    const head = `<div class="pane-head">${svg('mdi:playlist-music')}<span>${esc(t.queue)}${this._queueTotal
-      ? ` · ${this._queueTotal} ${esc(this._queueTotal === 1 ? t.track1 : t.tracks)}` : ''}</span>
+    const qs = this._qs;
+    const total = qs ? qs.total : 0;
+    const head = `<div class="pane-head">${svg('mdi:playlist-music')}<span id="q-head">${esc(t.queue)}${total
+      ? ` · ${total} ${esc(total === 1 ? t.track1 : t.tracks)}` : ''}</span>
       <button class="close" data-act="queue" aria-label="${esc(t.queue)}">${svg('mdi:close')}</button></div>`;
-    if (this._queueBusy) return `<div class="pane">${head}<div class="pane-empty">${esc(t.queueLoading)}</div></div>`;
-    if (!this._queue.length) return `<div class="pane">${head}<div class="pane-empty">${esc(t.queueEmpty)}</div></div>`;
-    const rows = this._queue.map((item, index) => {
-      const media = item.media_item || {};
-      const image = VEILIG(media.image || item.image || '');
-      const name = media.name || item.name || item.title || item.media_title || t.track;
-      const artists = (media.artists || []).map((artist) => artist && artist.name).filter(Boolean).slice(0, 2).join(', ');
-      return `<div class="q-row${index === 0 ? ' now' : ''}">
-        ${image ? `<img alt="" src="${esc(image)}">` : `<span class="q-ph">${svg('mdi:music')}</span>`}
-        <div class="q-tx"><div class="q-label">${esc(index === 0 ? t.nowLabel : t.nextLabel)}</div>
-          <div class="q-name">${esc(name)}</div>${artists ? `<div class="q-art">${esc(artists)}</div>` : ''}</div></div>`;
-    }).join('');
-    const more = this._queueTotal > this._queue.length
-      ? `<div class="q-more">+ ${this._queueTotal - this._queue.length} ${esc(t.tracks)}</div>` : '';
-    return `<div class="pane">${head}<div class="q-list">${rows}${more}</div></div>`;
+    if (!qs || qs.loading === 'all') return `<div class="pane">${head}<div class="pane-empty">${esc(t.queueLoading)}</div></div>`;
+    if (!qs.items.length) return `<div class="pane">${head}<div class="pane-empty">${esc(t.queueEmpty)}</div></div>`;
+    return `<div class="pane">${head}<div class="q-list" id="q-list">
+      <div class="q-more" id="q-top"${qs.start > 0 ? '' : ' hidden'}>${esc(t.queueLoading)}</div>
+      <div id="q-rows">${qs.items.map((item) => this._queueRowHtml(item, t)).join('')}</div>
+      <div class="q-more" id="q-bottom"${qs.start + qs.items.length < qs.total ? '' : ' hidden'}>${esc(t.queueLoading)}</div>
+    </div></div>`;
+  }
+
+  async _queuePage(offset, limit) {
+    const state = this._state(this._entity);
+    const queueId = state && state.attributes && state.attributes.active_queue;
+    if (!queueId || !this._cfg.config_entry_id) throw new Error('no queue');
+    const data = { config_entry_id: this._cfg.config_entry_id, queue_id: queueId };
+    if (offset != null) data.offset = offset;
+    if (limit != null) data.limit = limit;
+    const result = await this._hass.callWS({
+      type: 'call_service', domain: DOMAIN, service: 'get_queue_items',
+      service_data: data, return_response: true,
+    });
+    return (result && result.response) || {};
+  }
+
+  async _loadQueue() {
+    this._queueOpen = true;
+    const generation = (this._qs ? this._qs.generation : 0) + 1;
+    this._qs = { generation, loading: 'all', items: [], start: 0, total: 0, current: null };
+    this._sync();
+    try {
+      const page = await this._queuePage(null, QUEUE_PAGE * 2);
+      if (!this._qs || this._qs.generation !== generation) return;
+      this._qs = {
+        generation, loading: null, items: page.items || [], start: Number(page.offset) || 0,
+        total: Number(page.total) || 0, current: page.current_index, scrolled: false,
+      };
+      this._notice = '';
+    } catch (error) {
+      if (!this._qs || this._qs.generation !== generation) return;
+      this._qs = { generation, loading: null, items: [], start: 0, total: 0, current: null };
+      this._notice = error && error.message ? error.message : String(error);
+    }
+    this._sync();
+  }
+
+  // Called after every render and on scroll: centres the current track once,
+  // then fetches a page when the list gets near an end.
+  _queueScroll() {
+    const qs = this._qs;
+    const list = this.shadowRoot.getElementById('q-list');
+    if (!qs || !list || qs.loading) return;
+    if (!qs.scrolled) {
+      qs.scrolled = true;
+      const now = list.querySelector('.q-row.now');
+      if (now) list.scrollTop = Math.max(0, now.offsetTop - list.offsetTop - 12);
+      return;
+    }
+    const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 400;
+    const nearTop = list.scrollTop < 300;
+    if (nearBottom && qs.start + qs.items.length < qs.total) this._queueMore(1);
+    else if (nearTop && qs.start > 0) this._queueMore(-1);
+  }
+
+  async _queueMore(direction) {
+    const qs = this._qs;
+    const t = this._t();
+    qs.loading = direction > 0 ? 'down' : 'up';
+    const offset = direction > 0 ? qs.start + qs.items.length : Math.max(0, qs.start - QUEUE_PAGE);
+    const limit = direction > 0 ? QUEUE_PAGE : qs.start - offset;
+    let items = [];
+    try {
+      const page = await this._queuePage(offset, limit);
+      items = page.items || [];
+      if (Number.isFinite(Number(page.total))) qs.total = Number(page.total);
+    } catch (error) {
+      items = [];
+    }
+    if (this._qs !== qs) return;
+    qs.loading = null;
+    const list = this.shadowRoot.getElementById('q-list');
+    const rows = this.shadowRoot.getElementById('q-rows');
+    if (!list || !rows) return;
+    const html = items.map((item) => this._queueRowHtml(item, t)).join('');
+    if (direction > 0) {
+      qs.items = qs.items.concat(items);
+      rows.insertAdjacentHTML('beforeend', html);
+      if (!items.length) qs.total = qs.start + qs.items.length;
+    } else {
+      // Keep what is under the finger in place while rows appear above it.
+      const before = list.scrollHeight;
+      qs.items = items.concat(qs.items);
+      qs.start = offset;
+      rows.insertAdjacentHTML('afterbegin', html);
+      list.scrollTop += list.scrollHeight - before;
+      if (!items.length) qs.start = 0;
+    }
+    const top = this.shadowRoot.getElementById('q-top');
+    const bottom = this.shadowRoot.getElementById('q-bottom');
+    if (top) top.hidden = qs.start <= 0;
+    if (bottom) bottom.hidden = qs.start + qs.items.length >= qs.total;
   }
 
   // Replaces an element's content only when it really changed, so a state
@@ -482,7 +591,8 @@ export class KioskNowPlayingCard extends HTMLElement {
     let coverHtml;
     if (this._queueOpen) {
       coverHtml = this._queueHtml(t);
-      coverKey = coverHtml;
+      const qs = this._qs;
+      coverKey = `queue|${qs ? qs.generation : 0}|${!qs || qs.loading === 'all' ? 'loading' : qs.items.length ? 'list' : 'empty'}`;
     } else if (this._lyricsVisible && this._lyricsAvailable) {
       // No 'active' class here: _updateLyrics moves it without a rebuild.
       coverHtml = `<div class="pane lyrics-pane" id="lyrics-pane"><div class="lyrics-lines">${this._lyricsLines
@@ -499,6 +609,7 @@ export class KioskNowPlayingCard extends HTMLElement {
       cover._key = coverKey;
       cover.innerHTML = coverHtml;
       this._activeLyricIndex = -1;
+      if (this._queueOpen) requestAnimationFrame(() => this._queueScroll());
     }
     const background = $('background');
     if (background._key !== pictureKey) {
@@ -662,33 +773,6 @@ export class KioskNowPlayingCard extends HTMLElement {
       this._notice = error && error.message ? error.message : String(error);
     }
     this._signature = '';
-    this._sync();
-  }
-
-  async _loadQueue() {
-    const state = this._state(this._entity);
-    const queueId = state && state.attributes && state.attributes.active_queue;
-    if (!queueId || !this._cfg.config_entry_id) return;
-    this._queueOpen = true;
-    this._queueBusy = true;
-    this._sync();
-    try {
-      const result = await this._hass.callWS({
-        type: 'call_service', domain: 'music_assistant', service: 'get_queue',
-        service_data: {}, target: { entity_id: this._entity },
-        return_response: true,
-      });
-      const response = (result && result.response) || result || {};
-      const queue = response[this._entity] || {};
-      this._queue = [queue.current_item, queue.next_item].filter(Boolean);
-      this._queueTotal = Number(queue.items) || this._queue.length;
-      this._notice = '';
-    } catch (error) {
-      this._queue = [];
-      this._queueTotal = 0;
-      this._notice = error && error.message ? error.message : String(error);
-    }
-    this._queueBusy = false;
     this._sync();
   }
 

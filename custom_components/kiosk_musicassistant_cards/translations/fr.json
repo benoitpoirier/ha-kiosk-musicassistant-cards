@@ -64,10 +64,35 @@
           "name": "Source",
           "description": "music_assistant : lignes de Music Assistant. similar : nouveaux titres recommandés par vos fournisseurs musicaux (Spotify, Tidal, YouTube Music, Deezer…) selon votre historique d’écoute. mixed : titres similaires puis lignes Music Assistant (repli sur les lignes Music Assistant si aucun fournisseur ne sait recommander)."
         },
-        "refresh": {"name": "Actualiser","description": "Recalcule les recommandations au lieu de renvoyer celles en cache (cache de 30 minutes, recalculé en arrière-plan)."},
+        "refresh": {
+          "name": "Actualiser",
+          "description": "Recalcule les recommandations au lieu de renvoyer celles en cache (cache de 30 minutes, recalculé en arrière-plan)."
+        },
         "spotify_entity": {
           "name": "Lecteur SpotifyPlus",
           "description": "Lecteur SpotifyPlus du compte dont l’historique Spotify (top titres et écoutes récentes) sert de base aux recommandations. Facultatif : sans lui, l’historique d’écoute et les favoris Music Assistant sont utilisés."
+        }
+      }
+    },
+    "get_queue_items": {
+      "name": "Obtenir la file d’attente",
+      "description": "Retourne une page de la file d’attente d’un lecteur Music Assistant, avec sa taille et la position courante.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Music Assistant",
+          "description": "L’entrée de configuration Music Assistant à interroger."
+        },
+        "queue_id": {
+          "name": "File",
+          "description": "Identifiant de la file (attribut active_queue du lecteur)."
+        },
+        "offset": {
+          "name": "Décalage",
+          "description": "Premier élément retourné. Par défaut : deux éléments avant le titre en cours."
+        },
+        "limit": {
+          "name": "Limite",
+          "description": "Nombre d’éléments retournés."
         }
       }
     }

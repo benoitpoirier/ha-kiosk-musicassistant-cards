@@ -65,3 +65,29 @@ get_recommendations:
       default: false
       selector:
         boolean:
+
+get_queue_items:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: music_assistant
+    queue_id:
+      required: true
+      example: "media_player.living_room"
+      selector:
+        text:
+    offset:
+      selector:
+        number:
+          min: 0
+          max: 100000
+          mode: box
+    limit:
+      default: 50
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: box
