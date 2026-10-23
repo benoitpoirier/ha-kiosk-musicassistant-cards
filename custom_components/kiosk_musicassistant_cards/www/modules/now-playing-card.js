@@ -627,9 +627,12 @@ export class KioskNowPlayingCard extends HTMLElement {
     });
     const provider = this._provider(attributes);
 
-    $('status').classList.toggle('playing', !!playing);
+    const statusEl = $('status');
+    statusEl.classList.toggle('playing', !!playing);
+    // The state stays available to screen readers and as a tooltip.
+    const stateLabel = playing ? t.playing : paused ? t.paused : t.stopped;
+    if (statusEl.title !== stateLabel) { statusEl.title = stateLabel; statusEl.setAttribute('aria-label', `${stateLabel} · ${playerName}`); }
     this._patch('status', `<span class="eq"><i></i><i></i><i></i></span>
-      <span class="st-label">${esc(playing ? t.playing : paused ? t.paused : t.stopped)}</span>
       <span class="st-player">${svg('mdi:speaker')}<span>${esc(playerName)}</span></span>`);
     this._patch('players', activePlayers.length > 1
       ? activePlayers.map((player) => `<button class="${player.entity === entity ? 'active' : ''}"
