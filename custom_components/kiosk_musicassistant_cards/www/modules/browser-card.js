@@ -1063,9 +1063,15 @@ export class MusicAssistantTouchCard extends HTMLElement {
       if (generation !== this._sourceGeneration) return;
       await this._startVolume();
       if (generation !== this._sourceGeneration) return;
-      await this._call('music_assistant', 'play_media',
-        this._avecUser({ media_id: uri, enqueue: 'replace', radio_mode: !!radio }, username),
-        { entity_id: this._speler() });
+      // A single track takes the place of the one playing and keeps the rest
+      // of the queue; an album, playlist, artist or radio replaces the queue.
+      if (SOORT_VAN(uri) === 'track' && !radio) {
+        await this._call(DOMAIN, 'play_now', this._avecUser({ entity_id: this._speler(), uri }, username));
+      } else {
+        await this._call('music_assistant', 'play_media',
+          this._avecUser({ media_id: uri, enqueue: 'replace', radio_mode: !!radio }, username),
+          { entity_id: this._speler() });
+      }
     } catch (e) {
       this._fout(e);
     } finally {
@@ -1073,29 +1079,12 @@ export class MusicAssistantTouchCard extends HTMLElement {
     }
   }
 
-  // Start a track from a list: it plays at once at the top of a new queue,
-  // and the rest of the list (from the tapped track on, the ones before it
-  // last) is appended by the integration in the background. Music Assistant
-  // then moves through the queue by itself; nothing depends on the card.
-  async _speelLijst(uris, start, el) {
-    const schoon = (uris || []).filter(Boolean);
-    if (!schoon.length) return;
-    const username = this._user();
-    const i = Math.max(0, Math.min(start || 0, schoon.length - 1));
-    const rij = schoon.slice(i).concat(schoon.slice(0, i)).slice(0, 200);
-    const speler = this._speler();
-    if (el) el.classList.add('bezig');
-    this._opt = { state: 'playing', tot: Date.now() + 8000 };
-    this._vul = null;
-    try {
-      await this._voorbereiden();
-      await this._startVolume();
-      await this._call(DOMAIN, 'play_tracks', this._avecUser({ entity_id: speler, uris: rij }, username));
-    } catch (e) {
-      this._fout(e);
-    } finally {
-      if (el) el.classList.remove('bezig');
-    }
+  // A track tapped in a list (search results, album or playlist tracks,
+  // Discover) plays at once in place of the current track; the rest of the
+  // queue is kept. Only an album or playlist itself replaces the queue.
+  _speelLijst(uris, start, el) {
+    const uri = (uris || [])[Math.max(0, start || 0)];
+    if (uri) this._speel(uri, false, el);
   }
   _fout(e) {
     // A failed command must not leave the optimistic "playing" state behind.

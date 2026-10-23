@@ -296,6 +296,17 @@ response_variable: queue
 
 Returns `queue_id`, `current_index`, `total`, `offset` and `items` (`index`, `queue_item_id`, `name`, `artist`, `image`, `duration`). The now-playing card uses it for its queue panel: it opens on the current track with two pages loaded and fetches 25 more items whenever the list is scrolled near either end.
 
+### `kiosk_musicassistant_cards.play_now`
+
+```yaml
+action: kiosk_musicassistant_cards.play_now
+data:
+  entity_id: media_player.living_room
+  uri: spotify://track/5XEHDW9XdDosfI5pltNDq1
+  username: alice   # optional
+```
+
+Plays a track at once in place of the track that is playing: the new track is inserted after the current one and started, then the previous one is removed from the queue; the rest of the queue is kept. The browser card uses it for every single track (search results, album or playlist tracks, Discover, track tiles). Albums, playlists, artists and radio stations replace the whole queue.
 ### `kiosk_musicassistant_cards.play_tracks`
 
 ```yaml
@@ -308,7 +319,7 @@ data:
   username: alice   # optional
 ```
 
-Plays the first track at once in a new queue, then appends the other tracks in the background (Music Assistant resolves every track of a `play_media` call before starting, which takes a long time for a long list). The browser card uses it when a track is tapped in a list. Tracks that cannot be played are skipped (the first playable one starts). Calls for the same player run one after the other and a newer list stops the background append of the previous one, so tapping several tracks in a row always ends with the last one and its list.
+Plays the first track at once in a new queue, then appends the other tracks in the background (Music Assistant resolves every track of a `play_media` call before starting, which takes a long time for a long list). Tracks that cannot be played are skipped (the first playable one starts). Calls for the same player run one after the other and a newer list stops the background append of the previous one, so tapping several tracks in a row always ends with the last one and its list.
 ## Finding the Music Assistant `config_entry_id`
 
 In the card editor, pick Music Assistant from the drop-down. In YAML, open **Settings > Devices & services > Music Assistant**; the id is the last part of the URL of the integration entry, or use the drop-down of the `config_entry_id` field in **Developer tools > Actions**.

@@ -12,6 +12,7 @@ from homeassistant.components.music_assistant.schemas import media_item_dict_fro
 from homeassistant.core import ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_registry as er
 from music_assistant_models.queue_item import QueueItem
 
 _LOGGER = logging.getLogger(__name__)
@@ -178,3 +179,61 @@ async def async_play_tracks(call: ServiceCall) -> None:
                     return
 
     hass.async_create_background_task(append(), "kiosk_musicassistant_cards queue tracks")
+
+# ---------- play one track now ----------
+# Tapping a track replaces the track that is playing and leaves the rest of
+# the queue as it is: Music Assistant inserts the new track after the current
+# one and starts it (enqueue "play"); the track that was playing is then
+# removed from the queue. Only albums and playlists replace the whole queue.
+PLAY_NOW_SCHEMA = vol.Schema(
+    {
+        vol.Required("entity_id"): cv.entity_id,
+        vol.Required("uri"): cv.string,
+        vol.Optional("username"): cv.string,
+    }
+)
+
+
+async def async_play_now(call: ServiceCall) -> None:
+    """Play a track at once in place of the current one, keeping the queue."""
+    hass = call.hass
+    entity_id = call.data["entity_id"]
+    extra = {"username": call.data["username"]} if call.data.get("username") else {}
+    players = hass.data.setdefault(DATA_PLAY, {})
+    player = players.setdefault(entity_id, {"lock": asyncio.Lock(), "generation": 0})
+    player["generation"] += 1  # also stops the background append of play_tracks
+    generation = player["generation"]
+
+    entry = er.async_get(hass).async_get(entity_id)
+    mass = get_music_assistant_client(hass, entry.config_entry_id) if entry and entry.config_entry_id else None
+    state = hass.states.get(entity_id)
+    queue_id = state.attributes.get("active_queue") if state else None
+
+    async with player["lock"]:
+        if generation != player["generation"]:
+            return  # an even newer tap is waiting: it wins
+        previous = None
+        if mass is not None and queue_id:
+            queue = mass.player_queues.get(queue_id)
+            if queue is not None and queue.current_item is not None:
+                previous = queue.current_item.queue_item_id
+        await hass.services.async_call(
+            "music_assistant", "play_media",
+            {"media_id": call.data["uri"], "enqueue": "play", **extra},
+            target={"entity_id": entity_id}, blocking=True,
+        )
+        if previous is None:
+            return
+        # The queue may take a moment to move to the new track; the item that
+        # is still current cannot be removed, so try once more after a second.
+        for attempt in range(2):
+            try:
+                await mass.send_command(
+                    "player_queues/delete_item", queue_id=queue_id, item_id_or_index=previous
+                )
+                return
+            except Exception as err:  # noqa: BLE001
+                if attempt:
+                    _LOGGER.debug("Could not remove the previous track from %s: %s", queue_id, err)
+                else:
+                    await asyncio.sleep(1)

@@ -113,6 +113,24 @@
           "description": "Optional Music Assistant user to play as."
         }
       }
+    },
+    "play_now": {
+      "name": "Play track now",
+      "description": "Play a track at once in place of the current one; the rest of the queue is kept.",
+      "fields": {
+        "entity_id": {
+          "name": "Player",
+          "description": "Music Assistant player."
+        },
+        "uri": {
+          "name": "Track",
+          "description": "Music Assistant URI of the track."
+        },
+        "username": {
+          "name": "Music Assistant user",
+          "description": "Optional Music Assistant user to play as."
+        }
+      }
     }
   }
 }

@@ -17,8 +17,10 @@ from music_assistant_models.media_items import Track
 from .const import CARD_URL, DOMAIN, STATIC_URL
 from .queue import (
     GET_QUEUE_ITEMS_SCHEMA,
+    PLAY_NOW_SCHEMA,
     PLAY_TRACKS_SCHEMA,
     async_get_queue_items,
+    async_play_now,
     async_play_tracks,
 )
 from .recommendations import (
@@ -37,6 +39,7 @@ SERVICE_GET_TOP_PICKS = "get_top_picks"
 SERVICE_GET_RECOMMENDATIONS = "get_recommendations"
 SERVICE_GET_QUEUE_ITEMS = "get_queue_items"
 SERVICE_PLAY_TRACKS = "play_tracks"
+SERVICE_PLAY_NOW = "play_now"
 
 
 async def _async_get_track_lyrics(call: ServiceCall) -> dict[str, str | None]:
@@ -88,6 +91,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.services.async_register(
         DOMAIN, SERVICE_PLAY_TRACKS, async_play_tracks, schema=PLAY_TRACKS_SCHEMA
     )
+    hass.services.async_register(DOMAIN, SERVICE_PLAY_NOW, async_play_now, schema=PLAY_NOW_SCHEMA)
 
     async def _keep_warm(_now) -> None:
         async_keep_warm(hass)

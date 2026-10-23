@@ -113,6 +113,24 @@
           "description": "Utilisateur Music Assistant facultatif pour la lecture."
         }
       }
+    },
+    "play_now": {
+      "name": "Lire un titre maintenant",
+      "description": "Lit un titre immédiatement à la place du titre en cours ; le reste de la file est conservé.",
+      "fields": {
+        "entity_id": {
+          "name": "Lecteur",
+          "description": "Lecteur Music Assistant."
+        },
+        "uri": {
+          "name": "Titre",
+          "description": "URI Music Assistant du titre."
+        },
+        "username": {
+          "name": "Utilisateur Music Assistant",
+          "description": "Utilisateur Music Assistant facultatif pour la lecture."
+        }
+      }
     }
   }
 }
