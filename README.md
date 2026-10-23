@@ -7,16 +7,18 @@ Touch-first Lovelace cards for [Music Assistant](https://music-assistant.io/), d
 The package is a Home Assistant custom integration that:
 
 - serves and automatically loads the cards in the Home Assistant frontend (no manual Lovelace resource needed);
-- exposes two helper actions that reuse Home Assistant's already authenticated Music Assistant client, so no Music Assistant token is ever sent to the browser.
+- exposes three helper actions that reuse Home Assistant's already authenticated Music Assistant client, so no Music Assistant token is ever sent to the browser.
 
 ## Cards
 
 | Card | Type | Description |
 | --- | --- | --- |
-| Browser | `custom:kiosk-musicassistant-card` | Player, speaker switching, library categories, search with on-screen keyboard and navigation buttons in a single card. Visual editor included. |
+| Browser | `custom:kiosk-musicassistant-card` | Player, speaker switching, a *Discover* tab with Music Assistant recommendations, library categories, search with on-screen keyboard and navigation buttons in a single card. Visual editor included. |
 | Now playing | `custom:kiosk-musicassistant-now-playing` | Full-screen now-playing view: cover art, progress, transport, volume, queue preview, synchronised lyrics and optional Spotify favourites. YAML configuration. |
 
 Interface languages: English, French and Dutch (follows Home Assistant, or set `language`).
+
+Both cards are responsive and tuned for a 1280×800 kiosk (Echo Show 8 class): the tile grid adds columns and enlarges the artwork as the screen gets wider.
 
 ## Requirements
 
@@ -119,7 +121,8 @@ links:
 | `height` | `556` | Card height in pixels. |
 | `fill` | `false` | Fill the remaining screen height below the card (ignores `height`). |
 | `fill_margin` | `8` | Bottom margin in pixels when `fill` is enabled. |
-| `arrows` | `true` | Scroll buttons and a draggable scrollbar next to lists (for devices where touch scrolling is unreliable, e.g. cast displays). |
+| `arrows` | `true` | Scroll buttons and a draggable scrollbar next to lists (for devices where touch scrolling is unreliable, e.g. cast displays). Also adds left/right buttons to the Discover carousels. |
+| `discover` | `true` | Show the *Discover* tab (first tab, opened by default) with Music Assistant's recommendation rows for the selected music source. |
 | `kiosk_theme` | `true` | Kiosk styling with large touch targets. Set to `false` to follow the plain Home Assistant theme. |
 | `language` | HA language | `en`, `fr` or `nl`. |
 | `volume_max` | `100` | Maximum volume (%); also the end of the slider. |
@@ -177,6 +180,10 @@ To find a media id: **Developer tools > Actions > Music Assistant: Search**, ena
 | `search` | Optional text filter. |
 | `play`, `radio_mode` | Tile behaviour. |
 
+### Discover tab
+
+The *Discover* tab shows the rows Music Assistant builds on its home screen (recently played, recently added, provider recommendations, ...) as horizontal carousels, with a featured pick on top. Tap a cover to open an album, playlist or artist; tap the round play button to play it straight away. With `music_sources`, the rows are fetched for the selected Music Assistant user. The feed is cached for 10 minutes; the refresh button reloads it.
+
 ### `links`
 
 Navigation buttons inside the card, so a kiosk view can consist of a single card: `name`, `icon`, `path` (for example `/dashboard-kiosk/menu`).
@@ -186,7 +193,7 @@ Navigation buttons inside the card, so a kiosk view can consist of a single card
 ```yaml
 type: custom:kiosk-musicassistant-now-playing
 config_entry_id: <your_music_assistant_config_entry_id>
-height: 600
+fill: true
 language: en
 volume_step: 5
 players:
@@ -204,7 +211,9 @@ favorite_accounts:
 | Option | Default | Description |
 | --- | --- | --- |
 | `config_entry_id` | none | Music Assistant config entry. Required for the queue preview and lyrics. |
-| `height` | `560` | Card height in pixels (480 to 780). |
+| `height` | `560` | Card height in pixels (420 to 780). |
+| `fill` | `false` | Fill the remaining screen height below the card (ignores `height`), e.g. a full-screen panel view on a kiosk. |
+| `fill_margin` | `8` | Bottom margin in pixels when `fill` is enabled. |
 | `language` | HA language | `en`, `fr` or `nl`. |
 | `players` | all Music Assistant players | Players to follow. The card shows the one that is playing (or the most recently paused). When several play at once, buttons let you choose. |
 | `volume_step` | `5` | Volume button step (%). |
@@ -215,7 +224,7 @@ Synchronised lyrics are shown only when Music Assistant provides time-stamped (L
 
 ## Actions
 
-Both actions return a response (`return_response: true`).
+All actions return a response (`return_response: true`).
 
 ### `kiosk_musicassistant_cards.get_track_lyrics`
 
@@ -239,7 +248,21 @@ data:
 response_variable: picks
 ```
 
-Returns `items`, each with `name`, `uri`, `image` and `recommendation_reason`. Music Assistant recommendation rows are interleaved, then completed with recently played items.
+Returns `items`, each with `name`, `uri`, `image`, `media_type`, `artist` and `recommendation_reason`. Music Assistant recommendation rows are interleaved, then completed with recently played items.
+
+### `kiosk_musicassistant_cards.get_recommendations`
+
+```yaml
+action: kiosk_musicassistant_cards.get_recommendations
+data:
+  config_entry_id: <your_music_assistant_config_entry_id>
+  username: alice        # optional Music Assistant user
+  row_limit: 20          # optional, items per row (1-50)
+  include_hidden: false  # optional, also rows MA hides by default
+response_variable: discover
+```
+
+Returns `rows`, each with `id`, `name`, `translation_key`, `subtitle`, `icon` and `items` (same fields as above). Used by the *Discover* tab. When the Music Assistant server rejects the `username` argument, the feed of the account Home Assistant is connected with is returned instead.
 
 ## Finding the Music Assistant `config_entry_id`
 

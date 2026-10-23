@@ -309,7 +309,10 @@ ha-icon { pointer-events:none; }
 .wrap.met-art::before { opacity:.28; }
 :host(.licht) .wrap.met-art::before { opacity:.18; }
 
-/* tabs scroll sideways instead of being cut off */
+/* tabs scroll sideways instead of being cut off; search stays visible on the right */
+.tabrij { display:flex; align-items:flex-start; gap:8px; flex:0 0 auto; min-width:0; max-width:100%; }
+.tabrij .chips { flex:1 1 auto; }
+.tabrij .chips.zoekchips { flex:0 0 auto; }
 .chips { overflow-x:auto; overflow-y:hidden; scrollbar-width:none; }
 .chips::-webkit-scrollbar { display:none; }
 .chips button.ontdektab { display:flex; align-items:center; gap:6px; flex:0 0 auto; }
@@ -1573,9 +1576,16 @@ export class MusicAssistantTouchCard extends HTMLElement {
     let held = '';
     let heldR = -1;
     let heldI = -1;
-    for (let r = 0; r < c.rows.length && heldR < 0; r++) {
-      const i = c.rows[r].items.findIndex((it) => VEILIG(it.image) && SOORT_VAN(it.uri) !== 'track');
-      if (i >= 0) { heldR = r; heldI = i; }
+    // Feature something from a full row rather than the single item of
+    // "recently played", preferring an album or playlist with artwork.
+    const kandidaat = (row) => row.items.findIndex((it) => VEILIG(it.image)
+      && ['album', 'playlist'].includes(it.media_type || SOORT_VAN(it.uri)));
+    for (const minimum of [3, 1]) {
+      for (let r = 0; r < c.rows.length && heldR < 0; r++) {
+        if (c.rows[r].items.length < minimum) continue;
+        const i = kandidaat(c.rows[r]);
+        if (i >= 0) { heldR = r; heldI = i; }
+      }
     }
     if (heldR >= 0) {
       const it = c.rows[heldR].items[heldI];
@@ -1602,10 +1612,14 @@ export class MusicAssistantTouchCard extends HTMLElement {
       const nav = pijlen && row.items.length > 3 ? `<div class="ok-nav">
           <button data-act="okrol" data-r="${r}" data-d="-1">${svg('links')}</button>
           <button data-act="okrol" data-r="${r}" data-d="1">${svg('rechts')}</button></div>` : '';
+      // Music Assistant sends icons as 'mdi-name' and subtitles in English only.
+      const icoon = String(row.icon || '').replace(/^mdi[-:]/, '');
+      const engels = String(this._cfg.language || (this._hass && this._hass.language) || 'en').startsWith('en');
+      const sub = engels && row.subtitle ? `<small>${esc(row.subtitle)}</small>` : '';
       return `<section class="ok-rij">
         <div class="ok-kop">
-          ${row.icon ? `<span class="ok-ic">${svg(row.icon.indexOf(':') > 0 ? row.icon : `mdi:${row.icon}`)}</span>` : ''}
-          <div class="ok-titel">${esc(this._rijNaam(row))}${row.subtitle ? `<small>${esc(row.subtitle)}</small>` : ''}</div>
+          ${icoon ? `<span class="ok-ic">${svg(`mdi:${icoon}`)}</span>` : ''}
+          <div class="ok-titel">${esc(this._rijNaam(row))}${sub}</div>
           ${nav}
         </div>
         <div class="carrousel" id="okrij${r}">${kaarten}</div></section>`;
@@ -1621,9 +1635,9 @@ export class MusicAssistantTouchCard extends HTMLElement {
       : '';
     const tabs = this._cats.map((c, i) =>
       `<button class="${this._mode === 'home' && i === this._cat ? 'on' : ''}" data-act="cat" data-i="${i}">${esc(c.name)}</button>`).join('');
-    return `<div class="chips">${ontdek}${tabs}
-      <button class="zoektab${this._mode === 'zoek' ? ' on' : ''}" data-act="naarzoek"
-              title="${esc(t.zoek)}">${svg('zoek')}</button></div>`;
+    return `<div class="tabrij"><div class="chips">${ontdek}${tabs}</div>
+      <div class="chips zoekchips"><button class="zoektab${this._mode === 'zoek' ? ' on' : ''}" data-act="naarzoek"
+              title="${esc(t.zoek)}">${svg('zoek')}</button></div></div>`;
   }
 
   _zoekHtml() {
