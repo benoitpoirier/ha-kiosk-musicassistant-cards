@@ -24,13 +24,16 @@ ROW_LIMIT = 20
 MAX_ROW_LIMIT = 50
 
 SOURCE_MUSIC_ASSISTANT = "music_assistant"
+SOURCE_SIMILAR = "similar"
+# Former name of "similar", kept so existing configurations keep working.
 SOURCE_SPOTIFY = "spotify"
 SOURCE_MIXED = "mixed"
-SOURCES = [SOURCE_MUSIC_ASSISTANT, SOURCE_SPOTIFY, SOURCE_MIXED]
+SOURCES = [SOURCE_MUSIC_ASSISTANT, SOURCE_SIMILAR, SOURCE_SPOTIFY, SOURCE_MIXED]
 
-# Spotify discovery: a few tracks of the listening history are the seeds, and
-# Spotify's recommendation engine (reached through Music Assistant's Spotify
-# provider, whose global session still has that endpoint) does the rest.
+# Discovery: a few tracks of the listening history are the seeds, and the music
+# providers' own recommendation engines (Spotify, Tidal, YouTube Music, Deezer...)
+# return similar tracks through Music Assistant. Spotify's engine is reached via
+# MA's Spotify provider, whose global session still has the endpoint.
 SEED_POOL = 20
 SEED_COUNT = 6
 SEED_ROWS = 3
@@ -307,11 +310,11 @@ async def _async_similar(mass: Any, user: str | None, seed: dict[str, Any]) -> l
     return result if isinstance(result, list) else []
 
 
-async def _async_spotify_rows(
+async def _async_similar_rows(
     hass: HomeAssistant, mass: Any, entry_id: str, user: str | None,
     spotify_entity: str | None, row_limit: int,
 ) -> list[dict[str, Any]]:
-    """Discovery rows built by Spotify's recommendation engine from the listening history."""
+    """Discovery rows built by the providers' recommendation engines from the listening history."""
     seeds: list[dict[str, Any]] = []
     if spotify_entity:
         seeds = await _async_spotify_history_seeds(hass, spotify_entity)
@@ -343,7 +346,7 @@ async def _async_spotify_rows(
             items.append(item)
         return items
 
-    per_seed = [(seed, items_for(raw, "spotify")) for seed, raw in zip(chosen, answers)]
+    per_seed = [(seed, items_for(raw, "similar")) for seed, raw in zip(chosen, answers)]
     per_seed = [(seed, items) for seed, items in per_seed if items]
     if not per_seed:
         return []
@@ -355,14 +358,15 @@ async def _async_spotify_rows(
             if index < len(items) and items[index]["uri"] not in seen:
                 seen.add(items[index]["uri"])
                 mix.append(items[index])
+    icon = "mdi-spotify" if all(i["uri"].startswith("spotify") for i in mix) else "mdi-star-shooting-outline"
     rows = [
         {
-            "id": "spotify/for_you",
+            "id": "similar/for_you",
             "name": "Recommended for you",
             "translation_key": "for_you",
             "subtitle": None,
-            "icon": "mdi-spotify",
-            "source": SOURCE_SPOTIFY,
+            "icon": icon,
+            "source": SOURCE_SIMILAR,
             "items": mix[: max(row_limit, 24)],
         }
     ]
@@ -373,14 +377,14 @@ async def _async_spotify_rows(
         artists_done.add(seed["artist"].lower())
         rows.append(
             {
-                "id": f"spotify/because/{seed['item_id']}",
+                "id": f"similar/because/{seed['item_id']}",
                 "name": f"Because you listen to {seed['artist']}",
                 "translation_key": "because_you_listen",
                 "seed": seed["artist"],
                 "seed_track": seed["name"],
                 "subtitle": None,
                 "icon": "mdi-account-music",
-                "source": SOURCE_SPOTIFY,
+                "source": SOURCE_SIMILAR,
                 "items": items[:row_limit],
             }
         )
@@ -388,14 +392,16 @@ async def _async_spotify_rows(
 
 
 async def async_get_recommendations(call: ServiceCall) -> dict[str, list[dict[str, Any]]]:
-    """Return discovery rows from Spotify, Music Assistant, or both."""
+    """Return discovery rows: similar tracks from the music providers, MA rows, or both."""
     mass = get_music_assistant_client(call.hass, call.data["config_entry_id"])
     user = call.data.get("username")
     row_limit = call.data["row_limit"]
     source = call.data["source"]
+    if source == SOURCE_SPOTIFY:
+        source = SOURCE_SIMILAR
     rows: list[dict[str, Any]] = []
-    if source in (SOURCE_SPOTIFY, SOURCE_MIXED):
-        rows += await _async_spotify_rows(
+    if source in (SOURCE_SIMILAR, SOURCE_MIXED):
+        rows += await _async_similar_rows(
             call.hass, mass, call.data["config_entry_id"], user,
             call.data.get("spotify_entity"), row_limit,
         )

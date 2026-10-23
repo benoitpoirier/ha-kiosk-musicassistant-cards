@@ -156,7 +156,7 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         { name: 'fill', selector: { boolean: {} } },
         { name: 'discover', selector: { boolean: {} } },
         { name: 'discover_source', selector: { select: { mode: 'dropdown', options: [
-          { value: 'mixed', label: ed.srcMix }, { value: 'spotify', label: ed.srcSpotify },
+          { value: 'mixed', label: ed.srcMix }, { value: 'similar', label: ed.srcSimilar },
           { value: 'music_assistant', label: ed.srcMa },
         ] } } },
         { name: 'arrows', selector: { boolean: {} } },
@@ -172,7 +172,7 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         fill_margin: c.fill_margin == null ? 8 : c.fill_margin,
         fill: c.fill === true,
         discover: c.discover !== false,
-        discover_source: c.discover_source || 'mixed',
+        discover_source: c.discover_source === 'spotify' ? 'similar' : (c.discover_source || 'mixed'),
         arrows: c.arrows !== false,
         kiosk_theme: c.kiosk_theme !== false,
         language: c.language || '',

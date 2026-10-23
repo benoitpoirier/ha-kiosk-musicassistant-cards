@@ -62,11 +62,11 @@
         },
         "source": {
           "name": "Source",
-          "description": "music_assistant : lignes de Music Assistant. spotify : nouveaux titres du moteur de recommandation Spotify, à partir de votre historique d’écoute. mixed : lignes Spotify puis lignes Music Assistant."
+          "description": "music_assistant : lignes de Music Assistant. similar : nouveaux titres recommandés par vos fournisseurs musicaux (Spotify, Tidal, YouTube Music, Deezer…) selon votre historique d’écoute. mixed : titres similaires puis lignes Music Assistant (repli sur les lignes Music Assistant si aucun fournisseur ne sait recommander)."
         },
         "spotify_entity": {
           "name": "Lecteur SpotifyPlus",
-          "description": "Lecteur SpotifyPlus du compte dont l’historique Spotify (top titres et écoutes récentes) sert de base aux recommandations. Sans lui, l’historique Music Assistant est utilisé."
+          "description": "Lecteur SpotifyPlus du compte dont l’historique Spotify (top titres et écoutes récentes) sert de base aux recommandations. Facultatif : sans lui, l’historique d’écoute et les favoris Music Assistant sont utilisés."
         }
       }
     }

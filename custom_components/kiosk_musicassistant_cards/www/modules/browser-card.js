@@ -464,8 +464,9 @@ export class MusicAssistantTouchCard extends HTMLElement {
   // Music Assistant's own recommendation rows, fetched on behalf of the
   // selected music source so every person gets their own feed.
   _ontdekBron() {
-    const bron = this._cfg.discover_source;
-    return ['spotify', 'music_assistant', 'mixed'].includes(bron) ? bron : 'mixed';
+    // 'spotify' is the former name of 'similar'.
+    const bron = this._cfg.discover_source === 'spotify' ? 'similar' : this._cfg.discover_source;
+    return ['similar', 'music_assistant', 'mixed'].includes(bron) ? bron : 'mixed';
   }
 
   _ontdekSleutel() { return `${this._cfg.config_entry_id}|${this._user() || ''}|${this._ontdekBron()}`; }
@@ -1603,9 +1604,9 @@ export class MusicAssistantTouchCard extends HTMLElement {
     let heldR = -1;
     let heldI = -1;
     // Feature something from a full row rather than the single item of
-    // "recently played": the first Spotify pick, else an album or playlist.
+    // "recently played": the first recommended track, else an album or playlist.
     const kandidaat = (row) => row.items.findIndex((it) => VEILIG(it.image)
-      && (row.source === 'spotify'
+      && ((row.source && row.source !== 'music_assistant')
         || ['album', 'playlist'].includes(it.media_type || SOORT_VAN(it.uri))));
     for (const minimum of [3, 1]) {
       for (let r = 0; r < c.rows.length && heldR < 0; r++) {

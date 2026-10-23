@@ -54,7 +54,7 @@ get_recommendations:
         select:
           options:
             - music_assistant
-            - spotify
+            - similar
             - mixed
     spotify_entity:
       selector:
