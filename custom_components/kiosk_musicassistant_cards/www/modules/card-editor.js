@@ -155,6 +155,7 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
           { name: 'fill_margin', selector: { number: { min: 0, max: 200, step: 1, mode: 'box' } } },
         ] },
         { name: 'fill', selector: { boolean: {} } },
+        { name: 'show_player', selector: { boolean: {} } },
         { name: 'discover', selector: { boolean: {} } },
         { name: 'discover_source', selector: { select: { mode: 'dropdown', options: [
           { value: 'mixed', label: ed.srcMix }, { value: 'similar', label: ed.srcSimilar },
@@ -174,6 +175,7 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         height: c.height == null ? 556 : c.height,
         fill_margin: c.fill_margin == null ? 8 : c.fill_margin,
         fill: c.fill === true,
+        show_player: c.show_player !== false,
         discover: c.discover !== false,
         discover_source: c.discover_source === 'spotify' ? 'similar' : (c.discover_source || 'mixed'),
         arrows: c.arrows !== false,
@@ -187,6 +189,7 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
           delete this._cfg.fill_margin;
         } else this._cfg.fill_margin = v.fill_margin;
         if (v.fill) this._cfg.fill = true; else delete this._cfg.fill;
+        if (v.show_player === false) this._cfg.show_player = false; else delete this._cfg.show_player;
         if (v.discover === false) this._cfg.discover = false; else delete this._cfg.discover;
         if (v.discover_source && v.discover_source !== 'mixed') this._cfg.discover_source = v.discover_source;
         else delete this._cfg.discover_source;

@@ -123,6 +123,7 @@ links:
 | `fill` | `false` | Fill the remaining screen height below the card (ignores `height`). |
 | `fill_margin` | `8` | Bottom margin in pixels when `fill` is enabled. |
 | `arrows` | `true` | Scroll buttons and a draggable scrollbar next to lists (for devices where touch scrolling is unreliable, e.g. cast displays). Also adds left/right buttons to the Discover carousels. |
+| `show_player` | `true` | Show the player column on the left. A round button at the start of the tab row hides or shows it; while hidden it carries the current cover. This option sets the initial state. |
 | `discover` | `true` | Show the *Discover* tab (first tab, opened by default). |
 | `discover_source` | `mixed` | `similar`: new tracks recommended by your music providers (Spotify, Tidal, YouTube Music, Deezer… any Music Assistant provider with similar tracks), seeded with your listening history. `music_assistant`: Music Assistant's own rows only — no streaming service needed. `mixed`: similar tracks first, then Music Assistant rows. `spotify` is accepted as the former name of `similar`. |
 | `spotify_entity` | none | Optional SpotifyPlus `media_player` whose Spotify history seeds the recommendations when the selected music source has no `spotify_entity`. |

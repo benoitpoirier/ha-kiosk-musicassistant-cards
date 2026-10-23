@@ -315,6 +315,19 @@ ha-icon { pointer-events:none; }
 /* tabs scroll sideways instead of being cut off; search stays visible on the right */
 .tabrij { display:flex; align-items:flex-start; gap:8px; flex:0 0 auto; min-width:0; max-width:100%; }
 .tabrij .chips { flex:1 1 auto; }
+/* player column toggle */
+.spelerknop { position:relative; flex:0 0 auto; width:46px; height:46px; border-radius:50%; overflow:hidden;
+  display:flex; align-items:center; justify-content:center; background:var(--ov1); color:var(--zacht);
+  box-shadow:inset 0 0 0 1px var(--line); }
+.spelerknop ha-icon { --mdc-icon-size:24px; }
+.spelerknop img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.spelerknop .knop-ic { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  background:rgba(0,0,0,.38); color:#fff; }
+.spelerknop.dicht.speelt { box-shadow:0 0 0 2px var(--acc), 0 6px 16px var(--acc-glow, rgba(0,0,0,.3)); }
+:host .wrap.sans-speler { grid-template-columns:minmax(0,1fr) !important; column-gap:0 !important; }
+.wrap.sans-speler > .left, .wrap.sans-speler > .scheiding { display:none !important; }
+.wrap.sans-speler > .right { animation:verbreed .3s ease; }
+@keyframes verbreed { from { opacity:.4; } to { opacity:1; } }
 .tabrij .chips.zoekchips { flex:0 0 auto; }
 .chips { overflow-x:auto; overflow-y:hidden; scrollbar-width:none; }
 .chips::-webkit-scrollbar { display:none; }
@@ -457,6 +470,10 @@ export class MusicAssistantTouchCard extends HTMLElement {
     this._schermtoetsen = config.keyboard !== false;
     this._kbd = this._schermtoetsen;
     this._zones = null;
+    // The player column starts as configured (show_player); the button in the
+    // tab row toggles it for the session. A changed setting resets it.
+    const spelerCfg = config.show_player !== false;
+    if (this._spelerCfg !== spelerCfg) { this._spelerCfg = spelerCfg; this._spelerZichtbaar = spelerCfg; }
     const ontdekWas = this._discover;
     this._discover = config.discover !== false;
     if (ontdekWas === undefined || ontdekWas !== this._discover) {
@@ -1163,7 +1180,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
       ? '' : `<style>${KIOSK_CSS}</style>`;
     this.shadowRoot.innerHTML = `<style>${STYLE}${VOL_CSS}</style>
       ${thema}
-      <div class="wrap" style="--mc-h:${h};--zn:${this._zoneLijst().length}">
+      <div class="wrap${this._spelerZichtbaar ? '' : ' sans-speler'}" style="--mc-h:${h};--zn:${this._zoneLijst().length}">
         <div class="col left">
           <div class="zones" id="zones"></div>
           ${this._sources.length
@@ -1360,6 +1377,12 @@ export class MusicAssistantTouchCard extends HTMLElement {
     const i = t.dataset.i !== undefined ? parseInt(t.dataset.i, 10) : null;
     if (a === 'zone') this._wisselZone(i, t);
     else if (a === 'src') this._wisselSource(i);
+    else if (a === 'speler') {
+      this._spelerZichtbaar = !this._spelerZichtbaar;
+      const wrap = this.shadowRoot.querySelector('.wrap');
+      if (wrap) wrap.classList.toggle('sans-speler', !this._spelerZichtbaar);
+      this._tekenRechts();
+    }
     else if (a === 'link') this._ganaar(((this._cfg.links || [])[i] || {}).path);
     else if (a === 'shuffle') {
       const s = this._st(this._actief());
@@ -1664,6 +1687,18 @@ export class MusicAssistantTouchCard extends HTMLElement {
     return chips + this._scrollbox(`<div class="ontdek vlak">${held}${voorlopig}${rijen}</div>`);
   }
 
+  // Shows or hides the player column. While hidden it carries the current
+  // cover, so what is playing stays in sight.
+  _spelerKnopHtml() {
+    const t = this._taal();
+    const label = this._spelerZichtbaar ? t.spelerVerbergen : t.spelerTonen;
+    const art = !this._spelerZichtbaar && this._knopArt
+      ? `<img alt="" src="${esc(this._knopArt)}"><span class="knop-ic">${svg('mdi:chevron-right')}</span>`
+      : svg(this._spelerZichtbaar ? 'mdi:chevron-left' : 'mdi:play-box-outline');
+    return `<button class="spelerknop${this._spelerZichtbaar ? '' : ' dicht'}${this._knopSpeelt ? ' speelt' : ''}"
+      data-act="speler" title="${esc(label)}" aria-label="${esc(label)}" aria-pressed="${!this._spelerZichtbaar}">${art}</button>`;
+  }
+
   // The tabs: discover first, then the categories, the search button last.
   _tabsHtml() {
     const t = this._taal();
@@ -1672,7 +1707,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
       : '';
     const tabs = this._cats.map((c, i) =>
       `<button class="${this._mode === 'home' && i === this._cat ? 'on' : ''}" data-act="cat" data-i="${i}">${esc(c.name)}</button>`).join('');
-    return `<div class="tabrij"><div class="chips">${ontdek}${tabs}</div>
+    return `<div class="tabrij">${this._spelerKnopHtml()}<div class="chips">${ontdek}${tabs}</div>
       <div class="chips zoekchips"><button class="zoektab${this._mode === 'zoek' ? ' on' : ''}" data-act="naarzoek"
               title="${esc(t.zoek)}">${svg('zoek')}</button></div></div>`;
   }
@@ -1881,6 +1916,15 @@ export class MusicAssistantTouchCard extends HTMLElement {
     const np = sr.getElementById('np');
     const a = this._metaLater(ent, (s && s.attributes) || {});
     const pic = a.entity_picture_local || a.entity_picture || '';
+    const knopArt = VEILIG(pic);
+    const knopSpeelt = !!(s && s.state === 'playing');
+    if (knopArt.replace(/([?&])(token|cache)=[^&]*/g, '$1') !== (this._knopArt || '').replace(/([?&])(token|cache)=[^&]*/g, '$1')
+      || knopSpeelt !== this._knopSpeelt) {
+      this._knopArt = knopArt;
+      this._knopSpeelt = knopSpeelt;
+      const knop = sr.querySelector('.spelerknop');
+      if (knop) knop.outerHTML = this._spelerKnopHtml();
+    }
     const t = this._taal();
     const titel = a.media_title || (s ? t.stil : t.geenSpeler);
     const artiest = [a.media_artist, a.media_album_name].filter(Boolean).join(' · ');
