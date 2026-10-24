@@ -360,6 +360,22 @@ ha-icon { pointer-events:none; }
 .launch-elapsed { color:var(--subtle); font-variant-numeric:tabular-nums; white-space:nowrap; }
 .launch-done .launch-status-pulse { animation:none; }
 .launch-done .launch-badge { box-shadow:0 0 0 4px var(--ov2); }
+/* light variant: a floating pill that never blocks the touch screen */
+.launch-overlay.light { padding:0; background:none; -webkit-backdrop-filter:none; backdrop-filter:none;
+  pointer-events:none; }
+.launch-light { display:flex; align-items:center; gap:14px; max-width:calc(100% - 32px);
+  padding:14px 24px 14px 20px; border:1px solid var(--line); border-radius:999px;
+  background:var(--ha-card-background,var(--card-background-color,#1c1c1e));
+  color:var(--primary-text-color,#e9e9ea); font-size:15px; font-weight:650; line-height:1.2;
+  box-shadow:0 16px 44px rgba(0,0,0,.45), 0 0 28px var(--acc-glow,rgba(29,185,84,.3));
+  animation:launch-pop .22s cubic-bezier(.2,.8,.2,1); }
+.launch-eq { flex:none; display:flex; align-items:flex-end; gap:3px; height:22px; }
+.launch-eq i { width:4px; height:100%; border-radius:2px; background:var(--grad,var(--acc));
+  transform-origin:bottom; animation:launch-eq 1s ease-in-out infinite; }
+.launch-eq i:nth-child(2) { animation-delay:-.25s; }
+.launch-eq i:nth-child(3) { animation-delay:-.5s; }
+.launch-eq i:nth-child(4) { animation-delay:-.75s; }
+@keyframes launch-eq { 0%, 100% { transform:scaleY(.3); } 50% { transform:scaleY(1); } }
 @keyframes launch-fade { from { opacity:0; } to { opacity:1; } }
 @keyframes launch-pop { from { opacity:0; transform:translateY(8px) scale(.98); }
   to { opacity:1; transform:translateY(0) scale(1); } }
@@ -371,7 +387,8 @@ ha-icon { pointer-events:none; }
 }
 @media (prefers-reduced-motion:reduce) {
   .launch-overlay, .launch-dialog, .launch-step.active .launch-step-mark::before,
-  .launch-status-pulse { animation:none; }
+  .launch-status-pulse, .launch-light, .launch-eq i { animation:none; }
+  .launch-eq i { transform:scaleY(.65); }
   .launch-progress span { transition:none; }
 }
 
@@ -1129,6 +1146,14 @@ export class MusicAssistantTouchCard extends HTMLElement {
 
   _playbackDialogHtml() {
     const t = this._getLanguage().launch;
+    if (this._cfg.full_modal !== true) {
+      return `<div class="launch-overlay light" id="launch-overlay" hidden>
+        <section class="launch-light" id="launch-dialog" role="status" aria-live="polite" aria-busy="true">
+          <span class="launch-eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          <span id="launch-title">${esc(t.title)}</span>
+        </section>
+      </div>`;
+    }
     return `<div class="launch-overlay" id="launch-overlay" hidden>
       <section class="launch-dialog" id="launch-dialog" role="dialog" aria-modal="true"
         aria-labelledby="launch-title" aria-describedby="launch-status" tabindex="-1">

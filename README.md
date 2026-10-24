@@ -137,6 +137,7 @@ links:
 | `tile_action` | `open` | `open` shows the tracks of a tile, `play` plays it straight away. |
 | `transfer_on_switch` | `true` | Move the queue to the new speaker when switching zones while playing. |
 | `retry_next` | `true` | Re-send *next/previous* once if nothing happened after 2.5 s (some Chromecast players). |
+| `full_modal` | `false` | Show the detailed step-by-step modal while a track starts. By default a light pill with an animated icon and a short phrase is shown instead. |
 | `keyboard` | `true` | Built-in on-screen keyboard. `false` uses a regular text field and the device keyboard. |
 | `limit` | `24` | Search results per media type. |
 | `search_types` | all | Subset of `track`, `album`, `artist`, `playlist`. |
