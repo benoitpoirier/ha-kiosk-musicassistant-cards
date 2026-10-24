@@ -2,6 +2,8 @@
 
 Kiosk Music Assistant Cards for Home Assistant.
 
+[![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=benoitpoirier&repository=ha-kiosk-musicassistant-cards&category=integration)
+
 Touch-first Lovelace cards for [Music Assistant](https://music-assistant.io/), designed for wall tablets, Echo Show / Nest Hub style kiosks and any touch screen running a Home Assistant dashboard.
 
 The package is a Home Assistant custom integration that:
@@ -63,6 +65,8 @@ Both cards are responsive and tuned for a 1280×800 kiosk (Echo Show 8 class): t
 ## Installation
 
 ### HACS (recommended)
+
+One click: [![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=benoitpoirier&repository=ha-kiosk-musicassistant-cards&category=integration) opens the repository in HACS on your instance (it asks to add it as a custom repository if needed). Then continue at step 3. Or do it by hand:
 
 1. HACS > three-dot menu > **Custom repositories**.
 2. Add `https://github.com/benoitpoirier/ha-kiosk-musicassistant-cards` with type **Integration**.
