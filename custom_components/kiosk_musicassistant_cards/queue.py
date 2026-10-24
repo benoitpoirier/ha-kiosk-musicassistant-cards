@@ -200,7 +200,7 @@ PLAY_NOW_SCHEMA = vol.Schema(
 # can take seconds and must not delay the start of playback.
 AUTOFILL_COUNT = 10
 AUTOFILL_WAIT = 30
-AUTOFILL_SETTLE = 2
+AUTOFILL_SETTLE = 12
 
 
 async def async_play_now(call: ServiceCall) -> None:
@@ -262,14 +262,26 @@ async def _autofill_similar(
             break
         await asyncio.sleep(1)
     if not queue_id:
+        _LOGGER.debug("Autofill on %s: the player never started", entity_id)
         return
-    # Lets the replaced track leave the queue before counting.
-    await asyncio.sleep(AUTOFILL_SETTLE)
-    queue = mass.player_queues.get(queue_id)
-    if generation != player["generation"] or queue is None or (queue.items or 0) > 1:
+    # The replaced track leaves the queue a moment after the new one starts:
+    # wait until the new track is alone rather than counting too early.
+    queue = None
+    for _ in range(AUTOFILL_SETTLE):
+        await asyncio.sleep(1)
+        if generation != player["generation"]:
+            return
+        queue = mass.player_queues.get(queue_id)
+        if queue is not None and (queue.items or 0) <= 1:
+            break
+    if queue is None or (queue.items or 0) > 1:
+        _LOGGER.debug("Autofill on %s: the queue holds other tracks", entity_id)
         return
     try:
         raw_items = await _async_similar(mass, extra.get("username"), seed)
+        if not raw_items:
+            # A cold lookup can outlast the timeout; its answer is then cached.
+            raw_items = await _async_similar(mass, extra.get("username"), seed)
     except Exception as err:  # noqa: BLE001
         _LOGGER.debug("Similar tracks for %s failed: %s", uri, err)
         return
@@ -281,6 +293,7 @@ async def _autofill_similar(
         if len(uris) == AUTOFILL_COUNT:
             break
     if not uris:
+        _LOGGER.debug("Autofill on %s: no similar tracks for %s", entity_id, uri)
         return
     async with player["lock"]:
         # A newer tap, or tracks added meanwhile, make the suggestion obsolete.
