@@ -1,8 +1,9 @@
-import {
+const Q = new URL(import.meta.url).search;
+const {
   BIB_MAX, BIB_TTL, LARGE_IMAGE_URL, SMALL_IMAGE_URL, KEYBOARD_ROWS, MEDIA_TYPES, mediaTypeFromUri,
   normalizeSpotifyUri, PLAYING_STATES, safeImageUrl, VOLUME_CSS, defaultCategories, esc, formatDuration, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay,
-} from './shared.js';
-import { KIOSK_CSS, KIOSK_THEMES } from './kiosk-theme.js';
+} = await import(`./shared.js${Q}`);
+const { KIOSK_CSS, KIOSK_THEMES } = await import(`./kiosk-theme.js${Q}`);
 
 const DOMAIN = 'kiosk_musicassistant_cards';
 const PLAYBACK_TIMEOUT_S = 60;

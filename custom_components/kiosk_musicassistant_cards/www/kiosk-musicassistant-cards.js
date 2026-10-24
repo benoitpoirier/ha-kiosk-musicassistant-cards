@@ -1,9 +1,11 @@
-// Kiosk Music Assistant Cards entry point. Home Assistant loads this resource as a JavaScript module.
-import { MusicAssistantTouchCard } from './modules/browser-card.js';
-import { MusicAssistantTouchCardEditor } from './modules/card-editor.js';
-import { KioskNowPlayingCard } from './modules/now-playing-card.js';
+// Entry point. Home Assistant loads this resource as a JavaScript module.
+// Sub-modules are imported with the same ?v= query so a new version never reuses cached files.
+const VERSION = '1.4.9';
+const Q = `?v=${VERSION}`;
+const { MusicAssistantTouchCard } = await import(`./modules/browser-card.js${Q}`);
+const { MusicAssistantTouchCardEditor } = await import(`./modules/card-editor.js${Q}`);
+const { KioskNowPlayingCard } = await import(`./modules/now-playing-card.js${Q}`);
 
-const VERSION = '1.4.8';
 const DOCS = 'https://github.com/benoitpoirier/ha-kiosk-musicassistant-cards';
 
 const elements = [

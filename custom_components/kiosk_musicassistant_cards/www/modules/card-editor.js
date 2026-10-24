@@ -1,5 +1,6 @@
-import { ICON_ALIASES, TAAL } from './shared.js';
-import { KIOSK_THEMES } from './kiosk-theme.js';
+const Q = new URL(import.meta.url).search;
+const { ICON_ALIASES, TAAL } = await import(`./shared.js${Q}`);
+const { KIOSK_THEMES } = await import(`./kiosk-theme.js${Q}`);
 
 const EDSTYLE = `
 :host { display:block; }

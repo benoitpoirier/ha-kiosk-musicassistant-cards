@@ -1,5 +1,6 @@
-import { safeImageUrl, VOLUME_CSS, esc, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay } from './shared.js';
-import { THEME_COLORS } from './kiosk-theme.js';
+const Q = new URL(import.meta.url).search;
+const { safeImageUrl, VOLUME_CSS, esc, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay } = await import(`./shared.js${Q}`);
+const { THEME_COLORS } = await import(`./kiosk-theme.js${Q}`);
 
 const DOMAIN = 'kiosk_musicassistant_cards';
 const QUEUE_PAGE = 25;
