@@ -209,10 +209,10 @@ async def async_play_now(call: ServiceCall) -> None:
     state = hass.states.get(entity_id)
     queue_id = state.attributes.get("active_queue") if state else None
 
+    previous = None
     async with player["lock"]:
         if generation != player["generation"]:
             return  # an even newer tap is waiting: it wins
-        previous = None
         if mass is not None and queue_id:
             queue = mass.player_queues.get(queue_id)
             if queue is not None and queue.current_item is not None:
@@ -222,21 +222,27 @@ async def async_play_now(call: ServiceCall) -> None:
             {"media_id": call.data["uri"], "enqueue": "play", **extra},
             target={"entity_id": entity_id}, blocking=True,
         )
-        if previous is None:
+    if previous is not None:
+        # Cleanup must not delay the response or the next tap, so it runs after the lock.
+        hass.async_create_background_task(
+            _remove_previous_item(mass, queue_id, previous),
+            "kiosk_musicassistant_cards remove previous track",
+        )
+
+
+async def _remove_previous_item(mass: Any, queue_id: str, item_id: str) -> None:
+    """Drop the track that was replaced; retry once while it is still the current item."""
+    for attempt in range(2):
+        try:
+            await mass.send_command(
+                "player_queues/delete_item", queue_id=queue_id, item_id_or_index=item_id
+            )
             return
-        # The queue may take a moment to move to the new track; the item that
-        # is still current cannot be removed, so try once more after a second.
-        for attempt in range(2):
-            try:
-                await mass.send_command(
-                    "player_queues/delete_item", queue_id=queue_id, item_id_or_index=previous
-                )
-                return
-            except Exception as err:  # noqa: BLE001
-                if attempt:
-                    _LOGGER.debug("Could not remove the previous track from %s: %s", queue_id, err)
-                else:
-                    await asyncio.sleep(1)
+        except Exception as err:  # noqa: BLE001
+            if attempt:
+                _LOGGER.debug("Could not remove the previous track from %s: %s", queue_id, err)
+            else:
+                await asyncio.sleep(1)
 
 # ---------- remove a track from the queue ----------
 REMOVE_QUEUE_ITEM_SCHEMA = vol.Schema(

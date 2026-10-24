@@ -1,10 +1,12 @@
 import {
-  BIB_MAX, BIB_TTL, LARGE_IMAGE_URL, SMALL_IMAGE_URL, ICON_ALIASES, KEYBOARD_ROWS, MEDIA_TYPES, mediaTypeFromUri,
+  BIB_MAX, BIB_TTL, LARGE_IMAGE_URL, SMALL_IMAGE_URL, KEYBOARD_ROWS, MEDIA_TYPES, mediaTypeFromUri,
   normalizeSpotifyUri, PLAYING_STATES, safeImageUrl, VOLUME_CSS, defaultCategories, esc, formatDuration, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay,
 } from './shared.js';
 import { KIOSK_CSS, KIOSK_THEMES } from './kiosk-theme.js';
 
 const DOMAIN = 'kiosk_musicassistant_cards';
+const PLAYBACK_TIMEOUT_S = 60;
+const ACCEPTED_GRACE_MS = 3000;
 
 const STYLE = `
 :host {
@@ -40,94 +42,92 @@ const STYLE = `
 button { font:inherit; color:inherit; border:0; cursor:pointer; background:none; padding:0;
          transition:opacity .12s, color .12s, background .12s, transform .08s; }
 button:active { transform:scale(.96); }
-  _stabilizeMetadata(entityId, attributes) {
-    const delayMs = Math.max(0, Number(this._cfg.radio_delay) || 0) * 1000;
-    const isRadio = !attributes.media_duration && !!attributes.media_title;
-    const trackLag = Math.max(0, Number(this._cfg.radio_lag) || 0);
-    if (!entityId || !isRadio || (!delayMs && !trackLag)) return attributes;
-    if (trackLag) {
-      // Some stations publish their titles a whole song ahead: while you hear one
-      // track, the stream already names the next. A song has no fixed length, so
-      // seconds cannot fix that - staying one title behind can. The programme's
-      // own name (artist equal to the station) is not a track and passes straight
-      // through, so a talk break still shows as a talk break.
-      const stationName = attributes.media_album_name || attributes.media_channel || '';
-      const isProgramSegment = !!stationName && (attributes.media_artist || '') === stationName;
-      if (!this._metadataHistory) this._metadataHistory = {};
-      const history = this._metadataHistory[entityId] || (this._metadataHistory[entityId] = []);
-      if (!isProgramSegment) {
-        const latestEntry = history.length ? history[history.length - 1] : null;
-        if (!latestEntry || latestEntry.title !== attributes.media_title) {
-          history.push({
-            title: attributes.media_title,
-            artist: attributes.media_artist || '',
-            image: attributes.entity_picture_local || attributes.entity_picture || '',
-          });
-          if (history.length > 10) history.shift();
-          this._metadataHistoryTimes = this._metadataHistoryTimes || {};
-          this._metadataHistoryTimes[entityId] = Date.now();
-        }
-        const delayedEntry = history[history.length - 1 - trackLag];
-        if (delayedEntry) {
-          return Object.assign({}, attributes, {
-            media_title: delayedEntry.title,
-            media_artist: delayedEntry.artist,
-            entity_picture: delayedEntry.image,
-            entity_picture_local: '',
-          });
-        }
-      }
-      // The programme's name also arrives in the middle of a song, which looks the
-      // same as a real talk break. So it only takes over once no new title has come
-      // in for five minutes: a break or the news, rather than a flip mid-song.
-      const lastTrackAt = (this._metadataHistoryTimes || {})[entityId];
-      if (isProgramSegment && lastTrackAt && Date.now() - lastTrackAt < 300000) {
-        const previousEntry = history[history.length - 1 - trackLag];
-        if (previousEntry) {
-          return Object.assign({}, attributes, {
-            media_title: previousEntry.title,
-            media_artist: previousEntry.artist,
-            entity_picture: previousEntry.image,
-            entity_picture_local: '',
-          });
-        }
-      }
-      return attributes;
-    }
-    if (!this._meta) this._meta = {};
-    const history = this._meta[entityId] || (this._meta[entityId] = []);
-    const now = Date.now();
-    const currentMetadata = {
-      title: attributes.media_title || '',
-      artist: attributes.media_artist || '',
-      image: attributes.entity_picture_local || attributes.entity_picture || '',
-    };
-    const latestEntry = history.length ? history[history.length - 1] : null;
-    if (!latestEntry || latestEntry.title !== currentMetadata.title
-      || latestEntry.artist !== currentMetadata.artist || latestEntry.image !== currentMetadata.image) {
-      history.push(Object.assign({}, currentMetadata, { timestamp: now }));
-      if (history.length > 20) history.shift();
-    }
-    // The newest entry that is old enough to be audible by now.
-    let displayedEntry = history[0];
-    for (const entry of history) { if (now - entry.timestamp >= delayMs) displayedEntry = entry; }
-    // Still waiting on the next one: come back when it is due.
-    const nextEntry = history.find((entry) => now - entry.timestamp < delayMs);
-    if (nextEntry && !this._metaTimer) {
-      this._metaTimer = setTimeout(() => {
-        this._metaTimer = null;
-        this._syncPlayer();
-      }, delayMs - (now - nextEntry.timestamp) + 100);
-    }
-    if (!displayedEntry || (displayedEntry.title === currentMetadata.title
-      && displayedEntry.artist === currentMetadata.artist && displayedEntry.image === currentMetadata.image)) return attributes;
-    return Object.assign({}, attributes, {
-      media_title: displayedEntry.title,
-      media_artist: displayedEntry.artist,
-      entity_picture: displayedEntry.image,
-      entity_picture_local: '',
-    });
-  }
+.busy { opacity:.35 !important; }
+ha-icon { pointer-events:none; }
+
+/* Speaker zones use one segmented control. */
+.zones { display:grid; grid-template-columns:repeat(var(--zone-count,3),minmax(0,1fr)); gap:2px;
+         background:var(--ov1); border-radius:11px; padding:3px; flex:0 0 auto; }
+.sources { margin-top:6px; }
+.zones button { height:32px; border-radius:9px; display:flex; align-items:center;
+                justify-content:center; position:relative; color:var(--subtle); }
+.zones button.on { background:var(--ov2); color:var(--primary-text-color,#e9e9ea); }
+.zones ha-icon { --mdc-icon-size:19px; }
+.zones button.on ha-icon { color:var(--acc); }
+.zones button.playing::before { content:''; position:absolute; bottom:3px; width:3px; height:3px;
+        border-radius:999px; background:var(--acc); }
+
+/* The player is the focus of the left column. */
+.now-playing { flex:1 1 auto; min-height:0; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; text-align:center; position:relative;
+      padding:12px 0 4px; }
+.now-playing .glow { position:absolute; top:6px; left:50%; transform:translateX(-50%);
+            width:180px; height:180px; border-radius:50%; background-size:cover;
+            background-position:center; filter:blur(38px) saturate(1.5); opacity:.4; }
+.now-playing .art { position:relative; width:168px; height:168px; border-radius:12px; object-fit:cover;
+           box-shadow:0 10px 26px rgba(0,0,0,.45); flex:0 0 auto; }
+.now-playing .empty-art { position:relative; width:168px; height:168px; border-radius:12px;
+               background:var(--ov1); display:flex; align-items:center; justify-content:center;
+               flex:0 0 auto; }
+.now-playing .empty-art ha-icon { --mdc-icon-size:46px; color:var(--subtle); }
+.now-playing .tx { position:relative; width:100%; padding:14px 2px 0; }
+.now-playing .t { font-size:16px; font-weight:600; letter-spacing:-.2px;
+         white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.now-playing .a { font-size:12.5px; color:var(--subtle); margin-top:2px;
+         white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.now-playing .status-label { font-size:10px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+          color:var(--acc); margin-top:6px; white-space:nowrap; overflow:hidden;
+          text-overflow:ellipsis; }
+.now-playing .progress { position:relative; width:100%; padding:12px 2px 0; }
+.now-playing .progress-track { height:3px; border-radius:999px; background:var(--ov2); }
+.now-playing .progress-fill { height:3px; border-radius:999px; background:var(--muted); width:0; }
+.now-playing .time-label { display:flex; justify-content:space-between; font-size:10.5px;
+             color:var(--subtle); margin-top:5px; font-variant-numeric:tabular-nums; }
+.now-playing .ctr { position:relative; display:flex; align-items:center; justify-content:center;
+           gap:14px; margin-top:14px; width:100%; }
+.now-playing .ctr button { width:34px; height:34px; display:flex; align-items:center;
+                  justify-content:center; color:var(--muted); flex:0 0 auto; }
+.now-playing .ctr button:hover { color:var(--primary-text-color,#e9e9ea); }
+.now-playing .ctr button.primary { width:50px; height:50px; border-radius:999px;
+                        background:var(--acc); color:#fff; }
+.now-playing .ctr button.primary ha-icon { --mdc-icon-size:26px; }
+.now-playing .ctr button.shuf.on, .now-playing .ctr button.rep.on { color:var(--acc); }
+.now-playing .ctr ha-icon { --mdc-icon-size:22px; }
+.now-playing .ctr button.shuf ha-icon, .now-playing .ctr button.rep ha-icon { --mdc-icon-size:18px; }
+
+/* volume */
+.volume-row { display:flex; align-items:center; gap:12px; flex:0 0 auto; margin-top:14px; }
+.volume-row > button.vk { width:30px; height:30px; flex:0 0 auto; display:flex;
+                      align-items:center; justify-content:center; color:var(--muted); }
+.volume-row ha-icon { --mdc-icon-size:21px; }
+.volume-row .volume-label { flex:0 0 auto; min-width:36px; text-align:right; font-size:12px;
+                  font-weight:600; color:var(--muted); font-variant-numeric:tabular-nums; }
+.volume-row > button.slider { flex:1 1 0; width:auto; min-width:0; height:30px;
+                          position:relative; display:flex; align-items:center; }
+.slider .track { position:absolute; left:0; right:0; height:6px; border-radius:999px;
+                background:var(--ov2); }
+.slider .fill { position:absolute; left:0; height:6px; border-radius:999px; background:var(--acc); }
+.slider .button { position:absolute; width:14px; height:14px; border-radius:999px;
+                background:var(--primary-text-color,#fff);
+                box-shadow:0 1px 3px rgba(0,0,0,.35); margin-left:-7px; }
+
+/* Tabs use underlines instead of pills. */
+.chips { display:flex; gap:20px; flex-wrap:nowrap; min-width:0; max-width:100%;
+         border-bottom:1px solid var(--line); flex:0 0 auto; overflow:hidden; }
+.chips button { height:36px; font-size:13.5px; font-weight:600; color:var(--subtle);
+                white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+                border-bottom:2px solid transparent; margin-bottom:-1px; flex:0 1 auto; }
+.chips button.on { color:var(--primary-text-color,#e9e9ea); border-bottom-color:var(--acc); }
+.chips button.search-tab { margin-left:auto; flex:0 0 auto; display:flex; align-items:center; }
+.chips button.search-tab ha-icon { --mdc-icon-size:19px; }
+
+/* Responsive tile grid: as many columns as fit, tiles grow with the screen.
+   --tmin is the smallest a tile may get; it rises with the width of the right
+   column (container 'right-column'), so a bigger screen gets bigger artwork rather
+   than just more of it. */
+.right { container-type:inline-size; container-name:right-column; }
+.tiles { --tmin:136px; min-height:0; max-width:100%; height:100%; overflow-y:auto; overflow-x:hidden;
+         display:grid; grid-template-columns:repeat(auto-fill,minmax(var(--tmin),1fr));
          gap:18px 16px; align-content:start; padding:4px 2px 12px; scrollbar-width:none; }
 .tiles::-webkit-scrollbar { display:none; }
 @container right-column (max-width: 600px) { .tiles { --tmin:112px; gap:14px 12px; } }
@@ -559,6 +559,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
     this._onScreenKeyboard = config.keyboard !== false;
     this._keyboardVisible = this._onScreenKeyboard;
     this._zones = null;
+    this._watchedStateRefs = null;
     // The player column starts as configured (show_player); the button in the
     // tab row toggles it for the session. A changed setting resets it.
     const playerVisibilityConfigured = config.show_player !== false;
@@ -852,11 +853,28 @@ export class MusicAssistantTouchCard extends HTMLElement {
       this._cfg.categories = defaultCategories(hass.language);
       this._categories = this._cfg.categories;
     }
-    if (isFirstUpdate || !this.shadowRoot.firstChild) this._buildCard();
-    this._applyTheme();
-    this._syncKioskEditMode();
-    this._syncPlayer();
-    this._syncPlaybackStatus();
+    const rebuilt = isFirstUpdate || !this.shadowRoot.firstChild;
+    if (rebuilt) this._buildCard();
+    // Theme and edit mode are re-checked every second; this setter runs on every state change in the house.
+    if (rebuilt) { this._applyTheme(); this._syncKioskEditMode(); }
+    if (this._watchedStatesChanged() || rebuilt || this._optimisticState) {
+      this._syncPlayer();
+      this._syncPlaybackStatus();
+    }
+  }
+
+  // Home Assistant replaces a state object only when it changes, so reference equality is enough.
+  _watchedStatesChanged() {
+    const ids = new Set();
+    for (const zone of this._getZones()) {
+      if (zone.entity) ids.add(zone.entity);
+      if (zone.volume) ids.add(zone.volume);
+    }
+    if (this._playbackProgress) ids.add(this._playbackProgress.entity);
+    const next = [...ids].map((id) => this._getState(id));
+    const previous = this._watchedStateRefs;
+    this._watchedStateRefs = next;
+    return !previous || previous.length !== next.length || next.some((state, index) => state !== previous[index]);
   }
 
   // Measure the background the theme gives the card and switch the overlay colours
@@ -962,15 +980,6 @@ export class MusicAssistantTouchCard extends HTMLElement {
       { volume_level: targetVolume / 100 }, { entity_id: this._getVolumeEntity() }).catch(() => {});
   }
 
-  _adjustVolume(direction) {
-    const step = this._getVolumeStep() / 100;
-    const vs = this._getState(this._getVolumeEntity());
-    const currentVolume = Number(vs && vs.attributes.volume_level) || 0;
-    const targetLevel = Math.max(0, Math.min(1, Math.round((currentVolume + direction * step) * 10000) / 10000));
-    this._call('media_player', 'volume_set',
-      { volume_level: targetLevel }, { entity_id: this._getVolumeEntity() });
-  }
-
   async _ws(msg) { return this._hass.connection.sendMessagePromise(msg); }
 
   async _call(domain, service, data, target) {
@@ -979,7 +988,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
 
   // Dim a control briefly while its command runs, and show errors instead of
   // silently ignoring them.
-  _controlPlayer(service, data, el, afterQueueFill, retryOnFailure) {
+  _controlPlayer(service, data, el, retryOnFailure) {
     const entityId = this._getActivePlayer();
     if (!entityId) return false;
     // Some speakers take a second to respond. Briefly block double taps so a
@@ -1004,12 +1013,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
       const previousSignature = getPlayerSignature();
       setTimeout(() => { if (getPlayerSignature() === previousSignature) sendCommand(); }, 2500);
     });
-    // Wait for the remaining list to enter the queue before skipping, or there
-    // may not be a next track yet.
-    if (afterQueueFill && this._queueFillPromise) {
-      if (el) el.classList.add('busy');
-      this._queueFillPromise.then(runCommand, runCommand).then(() => { if (el) el.classList.remove('busy'); });
-    } else runCommand();
+    runCommand();
     return true;
   }
 
@@ -1160,19 +1164,21 @@ export class MusicAssistantTouchCard extends HTMLElement {
     return normalizeSpotifyUri(value).replace(/[?#].*$/, '').replace(/\/+$/, '');
   }
 
-  _startPlaybackProgress(uri) {
+  _startPlaybackProgress() {
     this._stopPlaybackProgress(this._playbackProgress);
     const status = {
-      uri: this._normalizeMediaId(uri),
       entity: this._getPlayerEntity(),
       previousUri: '',
+      previousTitle: '',
+      previousUpdatedAt: 0,
       startedAt: Date.now(),
-      requestAt: 0,
       phase: 0,
       sent: false,
       accepted: false,
+      acceptedAt: 0,
       completed: false,
       hidden: false,
+      opened: false,
       timer: null,
     };
     this._playbackProgress = status;
@@ -1229,15 +1235,17 @@ export class MusicAssistantTouchCard extends HTMLElement {
 
   _syncPlaybackStatus() {
     const status = this._playbackProgress;
-    if (!status || status.completed || !status.sent || !status.uri) return;
+    if (!status || status.completed || !status.sent) return;
     const state = this._getState(status.entity);
-    const attributes = (state && state.attributes) || {};
-    const currentUri = this._normalizeMediaId(attributes.media_content_id);
-    if (!state || state.state !== 'playing' || currentUri !== status.uri) return;
-    const updated = Date.parse(attributes.media_position_updated_at || '');
-    const changed = currentUri !== status.previousUri
-      || (Number.isFinite(updated) && updated >= status.requestAt)
-      || status.accepted;
+    if (!state || state.state !== 'playing') return;
+    const attributes = state.attributes || {};
+    // Music Assistant may report another uri than the one requested, and the kiosk clock may differ from
+    // Home Assistant's: only compare values against what the player reported before the request.
+    const updatedAt = Date.parse(attributes.media_position_updated_at || '') || 0;
+    const changed = this._normalizeMediaId(attributes.media_content_id) !== status.previousUri
+      || (attributes.media_title || '') !== status.previousTitle
+      || (status.accepted && updatedAt > status.previousUpdatedAt)
+      || (status.accepted && Date.now() - status.acceptedAt > ACCEPTED_GRACE_MS);
     if (changed) {
       status.completed = true;
       status.phase = this._getLanguage().launch.steps.length;
@@ -1248,10 +1256,11 @@ export class MusicAssistantTouchCard extends HTMLElement {
 
   _updatePlaybackElapsed() {
     const status = this._playbackProgress;
-    const elapsed = this.shadowRoot.getElementById('launch-elapsed');
-    if (!status || !elapsed || status.completed) return;
+    if (!status || status.completed) return;
     const seconds = Math.floor((Date.now() - status.startedAt) / 1000);
-    elapsed.textContent = this._getLanguage().launch.elapsed.replace('{seconds}', String(seconds));
+    if (seconds > PLAYBACK_TIMEOUT_S) { this._stopPlaybackProgress(status); return; }
+    const elapsed = this.shadowRoot.getElementById('launch-elapsed');
+    if (elapsed) elapsed.textContent = this._getLanguage().launch.elapsed.replace('{seconds}', String(seconds));
   }
 
   _hidePlaybackDialog() {
@@ -1279,7 +1288,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
     if (el) el.classList.add('busy');
     const shouldTrackPlayback = mediaTypeFromUri(uri) === 'track' && !radio;
     if (!shouldTrackPlayback) this._stopPlaybackProgress(this._playbackProgress);
-    const playbackStatus = shouldTrackPlayback ? this._startPlaybackProgress(uri) : null;
+    const playbackStatus = shouldTrackPlayback ? this._startPlaybackProgress() : null;
     this._optimisticState = { state: 'playing', expiresAt: Date.now() + 8000 };
     try {
       await this._preparePlayer();
@@ -1300,15 +1309,18 @@ export class MusicAssistantTouchCard extends HTMLElement {
         const entity = this._getPlayerEntity();
         if (playbackStatus && this._playbackProgress === playbackStatus) {
           const current = this._getState(entity);
+          const currentAttributes = (current && current.attributes) || {};
           playbackStatus.entity = entity;
-          playbackStatus.previousUri = this._normalizeMediaId(current && current.attributes.media_content_id);
-          playbackStatus.requestAt = Date.now();
+          playbackStatus.previousUri = this._normalizeMediaId(currentAttributes.media_content_id);
+          playbackStatus.previousTitle = currentAttributes.media_title || '';
+          playbackStatus.previousUpdatedAt = Date.parse(currentAttributes.media_position_updated_at || '') || 0;
           playbackStatus.sent = true;
           this._renderPlaybackProgress(playbackStatus);
         }
         await this._call(DOMAIN, 'play_now', this._withUser({ entity_id: entity, uri }, username));
         if (playbackStatus && this._playbackProgress === playbackStatus) {
           playbackStatus.accepted = true;
+          playbackStatus.acceptedAt = Date.now();
           this._setPlaybackPhase(playbackStatus, 3);
           this._syncPlaybackStatus();
         }
@@ -1459,6 +1471,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
     clearInterval(this._tickTimer);
     this._tickTimer = setInterval(() => {
       this._updateProgress(); this._updateCardHeight(); this._updateScrollRail(); this._updatePlaybackElapsed();
+      this._syncPlaybackStatus(); this._applyTheme(); this._syncKioskEditMode();
     }, 1000);
     if (shouldFill) requestAnimationFrame(() => this._updateCardHeight());
     if (!this._resizeListener) {
@@ -1713,8 +1726,8 @@ export class MusicAssistantTouchCard extends HTMLElement {
         this._syncPlayer();
       }
     }
-    else if (a === 'previous') this._controlPlayer('media_previous_track', {}, t, true);
-    else if (a === 'next') this._controlPlayer('media_next_track', {}, t, true, true);
+    else if (a === 'previous') this._controlPlayer('media_previous_track', {}, t);
+    else if (a === 'next') this._controlPlayer('media_next_track', {}, t, true);
   }
 
   // On a Cast Nest Hub, touch scrolling does not work, so show arrow buttons by
@@ -1849,15 +1862,15 @@ export class MusicAssistantTouchCard extends HTMLElement {
     const chips = this._tabsHtml();
     if (!cats.length) return chips + `<div class="empty">${this._getLanguage().geenCats}</div>`;
     const cat = cats[this._categoryIndex] || {};
-    const tiles = this._getCategoryTiles(cat);
+    const categoryTiles = this._getCategoryTiles(cat);
     // A source category has nothing to show until its fetch lands: show the
     // shape of what is coming rather than an empty grid.
-    if (cat.source && !tiles.length) {
+    if (cat.source && !categoryTiles.length) {
       const c = this._sourceCache[this._getSourceKey(cat.source)];
       return chips + (c ? `<div class="empty">${this._getLanguage().geenResultaat}</div>`
         : this._scrollBoxHtml(`<div class="content-pane">${this._skeletonHtml(10)}</div>`));
     }
-    const tiles = tiles.map((t, i) => this._tileHtml({
+    const tiles = categoryTiles.map((t, i) => this._tileHtml({
       act: 'tile', playAction: 'play-tile', i, uri: t.uri, name: t.name,
       subtitle: t.recommendation_reason || this._getSubtitle({ uri: t.uri }),
       image: this._getTileImage(t), icon: t.icon,
