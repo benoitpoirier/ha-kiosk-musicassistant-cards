@@ -428,7 +428,7 @@ ha-icon { pointer-events:none; }
 .wrap.no-player .player-toggle ha-icon { transform:rotate(180deg); }
 .wrap.no-player .player-toggle.playing { color:var(--acc); box-shadow:0 0 0 2px var(--acc),0 4px 14px var(--acc-glow,rgba(0,0,0,.35)); }
 @media (hover:hover) { .player-toggle:hover { color:var(--primary-text-color,#fff); } }
-@container card (min-width: 401px) {
+@container card (min-width: 481px) {
   :host .wrap.no-player { grid-template-columns:0 1px minmax(0,1fr) !important; }
   .wrap.no-player > .left { display:none !important; }
   .wrap.no-player > .right { animation:expand-content .3s ease; }
@@ -482,15 +482,28 @@ ha-icon { pointer-events:none; }
   .chips { gap:10px; }
   .chips button { font-size:12px; }
 }
-/* Genuinely narrow - a phone in portrait, or a one-column dashboard. Two
-   columns stop being readable here, so stack them. Never hide one: on the
-   card's own dashboard that half is the reason the card exists. */
-@container card (max-width: 400px) {
-  .wrap { grid-template-columns:minmax(0,1fr); height:auto;
-          min-height:var(--card-height,556px); row-gap:14px; padding:14px; }
+/* A phone in portrait, or a one-column dashboard: the player goes on top (art
+   beside the title, controls full width) and the browser below it. */
+@container card (max-width: 480px) {
+  .wrap { grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto; height:auto;
+          padding:12px; gap:12px; }
   .divider { display:none; }
-  .right { min-height:340px; }
-  .now-playing .art, .now-playing .empty-art { width:132px; height:132px; }
+  .left { grid-column:1; grid-row:1; }
+  .right { grid-column:1; grid-row:2; height:clamp(420px,72vh,680px); }
+  .wrap.no-player > .left { display:none !important; }
+  .wrap.no-player > .right { grid-row:1; }
+  .now-playing { display:grid; grid-template-columns:96px minmax(0,1fr);
+    grid-template-areas:"art tx" "prog prog" "ctr ctr"; column-gap:14px; align-items:center;
+    justify-content:stretch; text-align:left; padding:8px 0 0; }
+  .now-playing .art, .now-playing .empty-art { grid-area:art; width:96px; height:96px; }
+  .now-playing .tx { grid-area:tx; padding:0; }
+  .now-playing .t { font-size:17px; }
+  .now-playing .progress { grid-area:prog; padding-top:14px; }
+  .now-playing .ctr { grid-area:ctr; justify-content:space-between; gap:0; margin-top:12px; }
+  .now-playing .ctr button { width:46px; height:46px; }
+  .now-playing .ctr button.primary { width:60px; height:60px; }
+  .volume-row { margin-top:12px; }
+  .chips { gap:14px; }
 }
 `;
 
@@ -1780,7 +1793,8 @@ export class MusicAssistantTouchCard extends HTMLElement {
     const bottomMargin = this._cfg.fill_margin == null ? 8 : this._cfg.fill_margin;
     const h = Math.max(300, Math.round(window.innerHeight - topOffset - bottomMargin));
     // Keep the player density tied to card space, including space used by HA's header.
-    const heightMode = h <= 440 ? 'short' : h <= 560 ? 'tight' : h <= 720 ? 'compact' : 'normal';
+    const stacked = wrap.clientWidth > 0 && wrap.clientWidth <= 480;
+    const heightMode = stacked ? 'normal' : h <= 440 ? 'short' : h <= 560 ? 'tight' : h <= 720 ? 'compact' : 'normal';
     if (wrap.dataset.heightMode !== heightMode) wrap.dataset.heightMode = heightMode;
     const heightValue = h + 'px';
     if (h === this._filledHeight && wrap.style.getPropertyValue('--card-height') === heightValue) return;

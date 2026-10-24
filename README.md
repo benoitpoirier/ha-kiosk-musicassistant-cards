@@ -32,6 +32,7 @@ Both cards are responsive and tuned for a 1280×800 kiosk (Echo Show 8 class): t
 
 ## What's new
 
+- **Mobile portrait layout**: on a narrow screen (card width up to 480 px) the browser card stacks the player (artwork beside the title, full-width progress and controls) above the browser, and the now-playing card uses tighter sizes. The landscape layout is unchanged.
 - **Light playback modal**: while a track starts, a compact floating pill with an animated equalizer and a short sentence replaces the step-by-step dialog. It never blocks touch input. The detailed modal is still available with `full_modal: true`.
 - **Similar tracks after play** (`autofill_similar`, on by default): when a single track is played and is alone in the queue, similar tracks are queued in the background once it has started, so playback is never delayed.
 - **Faster, more reliable playback tracking**: the progress follows the real player state (watchdog, no dependency on clock skew) and avoids heavy work on every Home Assistant state update.

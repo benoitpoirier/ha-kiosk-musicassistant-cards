@@ -182,4 +182,31 @@ export const KIOSK_CSS = `
 .slider .button{background:var(--knob)!important}
 .featured{box-shadow:inset 0 0 0 1px var(--line)}
 .wrap.met-art::before{opacity:var(--art-opacity)!important}
+/* portrait phone: player on top (art beside the title), browser below */
+@container card (max-width:480px){
+.wrap,.wrap[data-height-mode]{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:auto auto!important;height:auto!important;padding:12px!important;gap:12px!important}
+.zones button{height:52px!important}
+.now-playing{display:grid!important;grid-template-columns:96px minmax(0,1fr)!important;grid-template-areas:"art tx" "prog prog" "ctr ctr"!important;column-gap:14px!important;align-items:center!important;justify-content:stretch!important;text-align:left!important;padding:8px 0 0!important;overflow:visible!important;flex:0 0 auto!important}
+.now-playing .art,.now-playing .empty-art{width:96px!important;height:96px!important;border-radius:16px!important}
+.now-playing .tx{padding:0!important}
+.now-playing .tx .t{font-size:18px!important}
+.now-playing .tx .a{font-size:13px!important}
+.now-playing .progress{padding-top:14px!important}
+.now-playing .ctr{justify-content:space-between!important;gap:0!important;margin-top:12px!important}
+.now-playing .ctr button{width:50px!important;height:50px!important}
+.now-playing .ctr button.shuf,.now-playing .ctr button.rep{width:44px!important;height:44px!important}
+.now-playing .ctr button.primary{width:68px!important;height:68px!important}
+.now-playing .ctr button.primary ha-icon{--mdc-icon-size:34px}
+.volume-row{gap:8px!important;margin-top:12px!important;padding:6px!important}
+.volume-row>button.vk{width:46px!important;height:46px!important}
+.volume-row .volume-label{min-width:40px!important;font-size:14px!important}
+.chips button{height:42px!important;font-size:13.5px!important}
+.chips button.search-tab{width:42px!important}
+.kbd button{height:44px!important}
+.kbd .num button{height:36px!important}
+.featured{padding:14px;gap:14px;min-height:0}
+.featured-art{width:88px;height:88px}
+.featured-title{font-size:20px}
+.button{height:42px;padding:0 16px;font-size:14px}
+}
 `;

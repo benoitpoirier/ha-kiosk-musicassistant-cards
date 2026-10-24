@@ -172,6 +172,21 @@ ha-icon { pointer-events:none; }
   .context { align-self:center; }
   .btn.sm { width:46px; height:46px; }
 }
+/* portrait phone */
+@container np (max-width:480px) {
+  .layout { --cov:min(78cqw,340px); gap:18px; padding:18px 16px 20px; }
+  .cover-area:has(.pane) { width:100%; aspect-ratio:auto; height:min(64vh,460px); }
+  .top { gap:8px; }
+  .actions { margin-left:0; }
+  .title { font-size:clamp(24px,7cqw,30px); }
+  .artist { font-size:18px; }
+  .album { font-size:15px; }
+  .btn.md { width:52px; height:52px; }
+  .btn.play { width:76px; height:76px; }
+  .volume-row .btn { width:42px; height:42px; }
+  .volume-row .vol-box { margin:0 4px; }
+  .vol-label { min-width:42px; padding-right:6px; font-size:14px; }
+}
 `;
 
 export class KioskNowPlayingCard extends HTMLElement {
