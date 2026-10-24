@@ -91,7 +91,7 @@ export const TAAL = {
     standaardCats: ['Top picks for you', 'Recently played', 'Recently added', 'Playlists'],
     ontdek: 'Discover', ontdekKop: 'Picked for you', ontdekLeeg: 'No recommendations yet. Play some music and come back later.',
     launch: {
-      eyebrow: 'PLAYBACK', title: 'Starting your track', success: 'Playback confirmed',
+      eyebrow: 'PLAYBACK', title: 'Loading your track', success: 'Playback confirmed',
       player: 'On {player}', hide: 'Hide progress', elapsed: '{seconds} s elapsed',
       steps: [
         { title: 'Prepare the player', detail: 'Apply configured zone and group actions, if needed' },
@@ -173,7 +173,7 @@ export const TAAL = {
     standaardCats: ['Topkeuzes voor jou', 'Onlangs gespeeld', 'Onlangs toegevoegd', 'Playlists'],
     ontdek: 'Ontdekken', ontdekKop: 'Voor jou gekozen', ontdekLeeg: 'Nog geen aanbevelingen. Speel wat muziek en kom later terug.',
     launch: {
-      eyebrow: 'AFSPELEN', title: 'Nummer starten', success: 'Afspelen bevestigd',
+      eyebrow: 'AFSPELEN', title: 'Bezig met laden', success: 'Afspelen bevestigd',
       player: 'Op {player}', hide: 'Voortgang verbergen', elapsed: '{seconds} s verstreken',
       steps: [
         { title: 'Speler voorbereiden', detail: 'Ingestelde zone- en groepsacties uitvoeren indien nodig' },
@@ -272,7 +272,7 @@ export const TAAL = {
     standaardCats: ['Meilleures sélections pour vous', 'Récemment écoutés', 'Récemment ajoutés', 'Playlists'],
     ontdek: 'Découvertes', ontdekKop: 'Sélectionné pour vous', ontdekLeeg: 'Pas encore de recommandations. Écoutez de la musique et revenez plus tard.',
     launch: {
-      eyebrow: 'LECTURE', title: 'Démarrage du morceau', success: 'Lecture confirmée',
+      eyebrow: 'LECTURE', title: 'Chargement en cours', success: 'Lecture confirmée',
       player: 'Sur {player}', hide: 'Masquer la progression', elapsed: '{seconds} s écoulées',
       steps: [
         { title: 'Préparation du lecteur', detail: 'Application des réglages de zone et de groupe, si nécessaire' },

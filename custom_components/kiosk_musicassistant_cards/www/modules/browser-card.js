@@ -1242,7 +1242,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
       status.completed = true;
       status.phase = this._getLanguage().launch.steps.length;
       this._renderPlaybackProgress(status);
-      status.timer = setTimeout(() => this._stopPlaybackProgress(status), status.hidden ? 0 : 850);
+      status.timer = setTimeout(() => this._stopPlaybackProgress(status), 0);
     }
   }
 
