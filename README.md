@@ -7,7 +7,17 @@ Touch-first Lovelace cards for [Music Assistant](https://music-assistant.io/), d
 The package is a Home Assistant custom integration that:
 
 - serves and automatically loads the cards in the Home Assistant frontend (no manual Lovelace resource needed);
-- exposes three helper actions that reuse Home Assistant's already authenticated Music Assistant client, so no Music Assistant token is ever sent to the browser.
+- exposes helper actions that reuse Home Assistant's already authenticated Music Assistant client, so no Music Assistant token is ever sent to the browser.
+
+## Screenshots
+
+Browser card (1280×800 kiosk):
+
+![Browser card](docs/screenshots/browser.png)
+
+Now playing card (1280×800 kiosk):
+
+![Now playing card](docs/screenshots/player.png)
 
 ## Cards
 
@@ -19,6 +29,15 @@ The package is a Home Assistant custom integration that:
 Interface languages: English, French and Dutch (follows Home Assistant, or set `language`).
 
 Both cards are responsive and tuned for a 1280×800 kiosk (Echo Show 8 class): the tile grid adds columns and enlarges the artwork as the screen gets wider.
+
+## What's new
+
+- **Light playback modal**: while a track starts, a compact floating pill with an animated equalizer and a short sentence replaces the step-by-step dialog. It never blocks touch input. The detailed modal is still available with `full_modal: true`.
+- **Similar tracks after play** (`autofill_similar`, on by default): when a single track is played and is alone in the queue, similar tracks are queued in the background once it has started, so playback is never delayed.
+- **Faster, more reliable playback tracking**: the progress follows the real player state (watchdog, no dependency on clock skew) and avoids heavy work on every Home Assistant state update.
+- **Volume buttons** of the browser card now match the main play button (round, theme gradient and glow).
+- **Cache-safe updates**: every module is loaded with the version in its URL, so a new version is never mixed with cached files from an older one.
+- Internal code identifiers and comments are now in English.
 
 ## Requirements
 
