@@ -1,25 +1,25 @@
-import { KORT, TAAL } from './shared.js';
+import { ICON_ALIASES, TAAL } from './shared.js';
 import { KIOSK_THEMES } from './kiosk-theme.js';
 
 const EDSTYLE = `
 :host { display:block; }
-.vak { margin-bottom:18px; }
-.kop { font-size:15px; font-weight:700; margin:0 0 8px; display:flex;
+.section { margin-bottom:18px; }
+.heading { font-size:15px; font-weight:700; margin:0 0 8px; display:flex;
        align-items:center; justify-content:space-between; gap:10px; }
 ha-expansion-panel { margin-bottom:8px; --expansion-panel-summary-padding:0 12px; }
-.rij { display:flex; align-items:center; gap:8px; }
-.blok { padding:4px 4px 12px; }
-.knop { border:0; cursor:pointer; font:inherit; font-size:13px; font-weight:600;
+.row { display:flex; align-items:center; gap:8px; }
+.block { padding:4px 4px 12px; }
+.button { border:0; cursor:pointer; font:inherit; font-size:13px; font-weight:600;
         border-radius:999px; padding:7px 14px;
         background:var(--primary-color); color:var(--text-primary-color,#fff); }
-.knop.weg { background:transparent; color:var(--error-color,#db4437); padding:6px 4px; }
-.leeg { opacity:.6; font-size:13px; padding:4px 2px 10px; }
-.tegels { padding-left:4px; }
-.tegel { border-top:1px solid var(--divider-color); padding:10px 0 2px; }
-.tegel:first-child { border-top:0; }
+.button.remove { background:transparent; color:var(--error-color,#db4437); padding:6px 4px; }
+.empty { opacity:.6; font-size:13px; padding:4px 2px 10px; }
+.tiles { padding-left:4px; }
+.tile { border-top:1px solid var(--divider-color); padding:10px 0 2px; }
+.tile:first-child { border-top:0; }
 `;
 
-const ED_LABEL = { path: 'pad', radio_mode: 'radio', count: 'aantal' };
+const ED_LABEL = { path: 'pad', radio_mode: 'radio', count: 'aantal', fill_source: 'vullen' };
 
 // Hint line under a field in the editor. Only for the fields where a new user
 // has nothing to go on - the media id above all: it is a plain text box and
@@ -33,122 +33,122 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
   }
 
   setConfig(config) {
-    const j = JSON.stringify(config || {});
-    this._cfg = JSON.parse(j);
-    if (j === this._laatst) return;   // onze eigen wijziging: niet herbouwen
-    this._laatst = j;
-    this._vuil = true;
-    this._teken();
+    const configJson = JSON.stringify(config || {});
+    this._cfg = JSON.parse(configJson);
+    if (configJson === this._lastConfigJson) return;   // Our own change: do not rebuild.
+    this._lastConfigJson = configJson;
+    this._dirty = true;
+    this._renderEditor();
   }
 
   set hass(hass) {
-    const eerste = !this._hass;
+    const isFirstUpdate = !this._hass;
     this._hass = hass;
-    if (eerste || this._vuil) this._teken();
+    if (isFirstUpdate || this._dirty) this._renderEditor();
     else this.shadowRoot.querySelectorAll('ha-form').forEach((f) => { f.hass = hass; });
   }
 
-  _ed() {
-    const g = ((this._cfg && this._cfg.language)
+  _getEditorText() {
+    const languageCode = ((this._cfg && this._cfg.language)
       || (this._hass && this._hass.language) || 'en').slice(0, 2).toLowerCase();
-    return (TAAL[g] || TAAL.en).ed;
+    return (TAAL[languageCode] || TAAL.en).ed;
   }
 
-  _soortNaam() {
-    const g = ((this._cfg && this._cfg.language)
+  _getMediaTypeLabel() {
+    const languageCode = ((this._cfg && this._cfg.language)
       || (this._hass && this._hass.language) || 'en').slice(0, 2).toLowerCase();
-    return (TAAL[g] || TAAL.en).soort;
+    return (TAAL[languageCode] || TAAL.en).soort;
   }
 
-  _melden() {
-    this._laatst = JSON.stringify(this._cfg);
+  _emitConfigChange() {
+    this._lastConfigJson = JSON.stringify(this._cfg);
     this.dispatchEvent(new CustomEvent('config-changed', {
       detail: { config: this._cfg }, bubbles: true, composed: true,
     }));
   }
 
-  _herbouw() {
-    this._melden();
-    this._vuil = true;
-    this._teken();
+  _rebuildEditor() {
+    this._emitConfigChange();
+    this._dirty = true;
+    this._renderEditor();
   }
 
-  _mdi(naam) {
-    const n = String(naam || '');
+  _iconHtml(name) {
+    const n = String(name || '');
     if (!n) return '';
-    return n.indexOf(':') > 0 ? n : (KORT[n] || '');
+    return n.indexOf(':') > 0 ? n : (ICON_ALIASES[n] || '');
   }
 
-  // Een ha-form met eigen labels. Data wordt eenmalig gezet; ha-form houdt
-  // daarna zijn eigen invoer bij, dus typen verliest nooit de focus.
-  _form(schema, data, bij) {
-    const ed = this._ed();
-    const f = document.createElement('ha-form');
-    f.hass = this._hass;
-    f.schema = schema;
-    f.data = data;
-    f.computeLabel = (sch) => ed[ED_LABEL[sch.name] || sch.name] || sch.name;
-    f.computeHelper = (sch) => ed[ED_HINT[sch.name]] || '';
-    f.addEventListener('value-changed', (ev) => {
+  // A ha-form with custom labels. Set its data once; ha-form keeps subsequent
+  // input itself, so typing never loses focus.
+  _appendForm(schema, data, onChange) {
+    const editorText = this._getEditorText();
+    const formElement = document.createElement('ha-form');
+    formElement.hass = this._hass;
+    formElement.schema = schema;
+    formElement.data = data;
+    formElement.computeLabel = (sch) => editorText[ED_LABEL[sch.name] || sch.name] || sch.name;
+    formElement.computeHelper = (sch) => editorText[ED_HINT[sch.name]] || '';
+    formElement.addEventListener('value-changed', (ev) => {
       ev.stopPropagation();
-      bij(ev.detail.value);
+      onChange(ev.detail.value);
     });
-    return f;
+    return formElement;
   }
 
-  _knop(tekst, cls, bij) {
+  _addButton(label, cls, onClick) {
     const b = document.createElement('button');
-    b.className = 'knop' + (cls ? ' ' + cls : '');
-    b.textContent = tekst;
-    b.addEventListener('click', bij);
+    b.className = 'button' + (cls ? ' ' + cls : '');
+    b.textContent = label;
+    b.addEventListener('click', onClick);
     return b;
   }
 
-  _paneel(titel, inhoud, weg) {
-    const p = document.createElement('ha-expansion-panel');
-    p.outlined = true;
-    p.header = titel;
-    const blok = document.createElement('div');
-    blok.className = 'blok';
-    blok.appendChild(inhoud);
-    if (weg) {
-      const r = document.createElement('div');
-      r.className = 'rij';
-      r.appendChild(this._knop(this._ed().weg, 'weg', weg));
-      blok.appendChild(r);
+  _addPanel(title, content, onRemove) {
+    const panel = document.createElement('ha-expansion-panel');
+    panel.outlined = true;
+    panel.header = title;
+    const contentBlock = document.createElement('div');
+    contentBlock.className = 'block';
+    contentBlock.appendChild(content);
+    if (onRemove) {
+      const removeRow = document.createElement('div');
+      removeRow.className = 'row';
+      removeRow.appendChild(this._addButton(this._getEditorText().weg, 'remove', onRemove));
+      contentBlock.appendChild(removeRow);
     }
-    p.appendChild(blok);
-    return p;
+    panel.appendChild(contentBlock);
+    return panel;
   }
 
-  _teken() {
+  _renderEditor() {
     if (!this._hass || !this._cfg) return;
-    this._vuil = false;
-    const ed = this._ed();
-    const sn = this._soortNaam();
-    const c = this._cfg;
-    const sr = this.shadowRoot;
-    sr.innerHTML = `<style>${EDSTYLE}</style>`;
-    const wortel = document.createElement('div');
-    sr.appendChild(wortel);
+    this._dirty = false;
+    const editorText = this._getEditorText();
+    const mediaTypeLabels = this._getMediaTypeLabel();
+    const config = this._cfg;
+    const shadowRoot = this.shadowRoot;
+    shadowRoot.innerHTML = `<style>${EDSTYLE}</style>`;
+    const root = document.createElement('div');
+    shadowRoot.appendChild(root);
 
-    // ---- algemeen ----
+    // ---- general ----
     //
     // Only the one field you cannot do without sits in the open. The rest is
     // grouped by the question it answers - how it looks, how it plays, how it
     // searches - because a single column of fourteen settings tells a newcomer
     // nothing about which three of them matter.
-    const algVak = document.createElement('div');
-    algVak.className = 'vak';
-    algVak.innerHTML = `<div class="kop">${ed.algemeen}</div>`;
-    algVak.appendChild(this._form(
+    const generalSection = document.createElement('div');
+    generalSection.className = 'section';
+    generalSection.innerHTML = `<div class="heading">${editorText.algemeen}</div>`;
+    generalSection.appendChild(this._appendForm(
       [{ name: 'config_entry_id', required: true,
         selector: { config_entry: { integration: 'music_assistant' } } }],
-      { config_entry_id: c.config_entry_id || '' },
-      (v) => { this._cfg.config_entry_id = v.config_entry_id; this._melden(); }
+      { config_entry_id: config.config_entry_id || '' },
+      (v) => { this._cfg.config_entry_id = v.config_entry_id; this._emitConfigChange(); }
     ));
 
-    algVak.appendChild(this._paneel(ed.weergave, this._form(
+    generalSection.appendChild(this._addPanel(editorText.weergave, this._appendForm(
       [
         { name: '', type: 'grid', schema: [
           { name: 'height', selector: { number: { min: 240, max: 1400, step: 2, mode: 'box' } } },
@@ -158,30 +158,30 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         { name: 'show_player', selector: { boolean: {} } },
         { name: 'discover', selector: { boolean: {} } },
         { name: 'discover_source', selector: { select: { mode: 'dropdown', options: [
-          { value: 'mixed', label: ed.srcMix }, { value: 'similar', label: ed.srcSimilar },
-          { value: 'music_assistant', label: ed.srcMa },
+          { value: 'mixed', label: editorText.srcMix }, { value: 'similar', label: editorText.srcSimilar },
+          { value: 'music_assistant', label: editorText.srcMa },
         ] } } },
         { name: 'arrows', selector: { boolean: {} } },
         { name: 'kiosk_theme', selector: { boolean: {} } },
         { name: 'theme', selector: { select: { mode: 'dropdown', options: KIOSK_THEMES
-          .map((value) => ({ value, label: (ed.themas || {})[value] || value })) } } },
+          .map((value) => ({ value, label: (editorText.themas || {})[value] || value })) } } },
         { name: 'language', selector: { select: { mode: 'dropdown', options: [
-          { value: '', label: ed.automatisch },
+          { value: '', label: editorText.automatisch },
           { value: 'nl', label: 'Nederlands' }, { value: 'en', label: 'English' },
           { value: 'fr', label: 'Français' },
         ] } } },
       ],
       {
-        height: c.height == null ? 556 : c.height,
-        fill_margin: c.fill_margin == null ? 8 : c.fill_margin,
-        fill: c.fill === true,
-        show_player: c.show_player !== false,
-        discover: c.discover !== false,
-        discover_source: c.discover_source === 'spotify' ? 'similar' : (c.discover_source || 'mixed'),
-        arrows: c.arrows !== false,
-        kiosk_theme: c.kiosk_theme !== false,
-        theme: KIOSK_THEMES.includes(c.theme) ? c.theme : 'sunset',
-        language: c.language || '',
+        height: config.height == null ? 556 : config.height,
+        fill_margin: config.fill_margin == null ? 8 : config.fill_margin,
+        fill: config.fill === true,
+        show_player: config.show_player !== false,
+        discover: config.discover !== false,
+        discover_source: config.discover_source === 'spotify' ? 'similar' : (config.discover_source || 'mixed'),
+        arrows: config.arrows !== false,
+        kiosk_theme: config.kiosk_theme !== false,
+        theme: KIOSK_THEMES.includes(config.theme) ? config.theme : 'sunset',
+        language: config.language || '',
       },
       (v) => {
         this._cfg.height = v.height;
@@ -197,11 +197,11 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         if (v.kiosk_theme === false) this._cfg.kiosk_theme = false; else delete this._cfg.kiosk_theme;
         if (v.theme && v.theme !== 'sunset') this._cfg.theme = v.theme; else delete this._cfg.theme;
         if (v.language) this._cfg.language = v.language; else delete this._cfg.language;
-        this._melden();
+        this._emitConfigChange();
       }
     )));
 
-    algVak.appendChild(this._paneel(ed.spelenKop, this._form(
+    generalSection.appendChild(this._addPanel(editorText.spelenKop, this._appendForm(
       [
         { name: '', type: 'grid', schema: [
           { name: 'volume_max', selector: { number: { min: 5, max: 100, step: 1, mode: 'box' } } },
@@ -209,18 +209,18 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
           { name: 'volume_step', selector: { number: { min: 0.1, max: 100, step: 0.1, mode: 'box' } } },
         ] },
         { name: 'tile_action', selector: { select: { mode: 'dropdown', options: [
-          { value: 'open', label: ed.openen }, { value: 'play', label: ed.afspelen },
+          { value: 'open', label: editorText.openen }, { value: 'play', label: editorText.afspelen },
         ] } } },
         { name: 'transfer_on_switch', selector: { boolean: {} } },
         { name: 'retry_next', selector: { boolean: {} } },
       ],
       {
-        volume_max: c.volume_max == null ? 100 : c.volume_max,
-        volume_start: c.volume_start == null ? null : c.volume_start,
-        volume_step: c.volume_step == null ? 1 : c.volume_step,
-        tile_action: c.tile_action || 'open',
-        transfer_on_switch: c.transfer_on_switch !== false,
-        retry_next: c.retry_next !== false,
+        volume_max: config.volume_max == null ? 100 : config.volume_max,
+        volume_start: config.volume_start == null ? null : config.volume_start,
+        volume_step: config.volume_step == null ? 1 : config.volume_step,
+        tile_action: config.tile_action || 'open',
+        transfer_on_switch: config.transfer_on_switch !== false,
+        retry_next: config.retry_next !== false,
       },
       (v) => {
         if (v.volume_max && v.volume_max !== 100) this._cfg.volume_max = v.volume_max;
@@ -232,38 +232,38 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         this._cfg.tile_action = v.tile_action;
         this._cfg.transfer_on_switch = !!v.transfer_on_switch;
         this._cfg.retry_next = !!v.retry_next;
-        this._melden();
+        this._emitConfigChange();
       }
     )));
 
-    algVak.appendChild(this._paneel(ed.zoekKop, this._form(
+    generalSection.appendChild(this._addPanel(editorText.zoekKop, this._appendForm(
       [
         { name: 'keyboard', selector: { boolean: {} } },
         { name: 'limit', selector: { number: { min: 6, max: 100, step: 1, mode: 'box' } } },
         { name: 'search_types', selector: { select: { multiple: true, mode: 'list', options: [
-          { value: 'track', label: sn.track }, { value: 'album', label: sn.album },
-          { value: 'artist', label: sn.artist }, { value: 'playlist', label: sn.playlist },
+          { value: 'track', label: mediaTypeLabels.track }, { value: 'album', label: mediaTypeLabels.album },
+          { value: 'artist', label: mediaTypeLabels.artist }, { value: 'playlist', label: mediaTypeLabels.playlist },
         ] } } },
       ],
       {
-        keyboard: c.keyboard !== false,
-        limit: c.limit == null ? 24 : c.limit,
-        search_types: c.search_types || ['track', 'album', 'artist', 'playlist'],
+        keyboard: config.keyboard !== false,
+        limit: config.limit == null ? 24 : config.limit,
+        search_types: config.search_types || ['track', 'album', 'artist', 'playlist'],
       },
       (v) => {
         this._cfg.keyboard = !!v.keyboard;
         this._cfg.limit = v.limit;
         this._cfg.search_types = v.search_types;
-        this._melden();
+        this._emitConfigChange();
       }
     )));
-    wortel.appendChild(algVak);
+    root.appendChild(generalSection);
 
     // ---- speakers ----
-    const zVak = document.createElement('div');
-    zVak.className = 'vak';
-    zVak.innerHTML = `<div class="kop">${ed.zones}</div>`;
-    const zones = c.zones || [];
+    const zoneSection = document.createElement('div');
+    zoneSection.className = 'section';
+    zoneSection.innerHTML = `<div class="heading">${editorText.zones}</div>`;
+    const zones = config.zones || [];
     const zSchema = [
       { name: '', type: 'grid', schema: [
         { name: 'name', selector: { text: {} } },
@@ -284,8 +284,8 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
     ];
     zones.forEach((z, i) => {
       const b = z.before || {};
-      const plat = {
-        name: z.name || '', icon: this._mdi(z.icon), entity: z.entity || '',
+      const zoneFormData = {
+        name: z.name || '', icon: this._iconHtml(z.icon), entity: z.entity || '',
         volume: z.volume || '', volume_max: z.volume_max == null ? null : z.volume_max,
         volume_start: z.volume_start == null ? null : z.volume_start,
         volume_step: z.volume_step == null ? null : z.volume_step,
@@ -293,40 +293,40 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         joinLeader: (b.join && b.join.leader) || '',
         joinMembers: (b.join && b.join.members) || [],
       };
-      const form = this._form(zSchema, plat, (v) => {
-        const zn = { name: v.name, entity: v.entity };
-        if (v.icon) zn.icon = v.icon;
-        if (v.volume) zn.volume = v.volume;
-        if (v.volume_max != null && v.volume_max !== '') zn.volume_max = v.volume_max;
-        if (v.volume_start != null && v.volume_start !== '') zn.volume_start = v.volume_start;
-        if (v.volume_step != null && v.volume_step !== '') zn.volume_step = v.volume_step;
-        const voor = {};
-        if (v.turn_off) voor.turn_off = v.turn_off;
-        if (v.unjoin) voor.unjoin = v.unjoin;
+      const form = this._appendForm(zSchema, zoneFormData, (v) => {
+        const zoneConfig = { name: v.name, entity: v.entity };
+        if (v.icon) zoneConfig.icon = v.icon;
+        if (v.volume) zoneConfig.volume = v.volume;
+        if (v.volume_max != null && v.volume_max !== '') zoneConfig.volume_max = v.volume_max;
+        if (v.volume_start != null && v.volume_start !== '') zoneConfig.volume_start = v.volume_start;
+        if (v.volume_step != null && v.volume_step !== '') zoneConfig.volume_step = v.volume_step;
+        const beforeConfig = {};
+        if (v.turn_off) beforeConfig.turn_off = v.turn_off;
+        if (v.unjoin) beforeConfig.unjoin = v.unjoin;
         if (v.joinLeader && (v.joinMembers || []).length) {
-          voor.join = { leader: v.joinLeader, members: v.joinMembers };
+          beforeConfig.join = { leader: v.joinLeader, members: v.joinMembers };
         }
-        if (Object.keys(voor).length) zn.before = voor;
+        if (Object.keys(beforeConfig).length) zoneConfig.before = beforeConfig;
         this._cfg.zones = (this._cfg.zones || []).slice();
-        this._cfg.zones[i] = zn;
-        this._melden();
+        this._cfg.zones[i] = zoneConfig;
+        this._emitConfigChange();
       });
-      zVak.appendChild(this._paneel(z.name || ed.naamloos, form, () => {
+      zoneSection.appendChild(this._addPanel(z.name || editorText.naamloos, form, () => {
         this._cfg.zones = zones.filter((x, k) => k !== i);
         if (!this._cfg.zones.length) delete this._cfg.zones;
-        this._herbouw();
+        this._rebuildEditor();
       }));
     });
-    zVak.appendChild(this._knop(ed.zoneToe, '', () => {
+    zoneSection.appendChild(this._addButton(editorText.zoneToe, '', () => {
       this._cfg.zones = (this._cfg.zones || []).concat([{ name: '', entity: '' }]);
-      this._herbouw();
+      this._rebuildEditor();
     }));
-    wortel.appendChild(zVak);
+    root.appendChild(zoneSection);
 
-    const sVak = document.createElement('div');
-    sVak.className = 'vak';
-    sVak.innerHTML = `<div class="kop">${ed.sources}</div>`;
-    const sources = c.music_sources || [];
+    const sourceSection = document.createElement('div');
+    sourceSection.className = 'section';
+    sourceSection.innerHTML = `<div class="heading">${editorText.sources}</div>`;
+    const sources = config.music_sources || [];
     const sSchema = [
       { name: '', type: 'grid', schema: [
         { name: 'name', selector: { text: {} } },
@@ -341,8 +341,8 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
       } } },
     ];
     sources.forEach((source, index) => {
-      const form = this._form(sSchema, {
-        name: source.name || '', icon: this._mdi(source.icon), username: source.username || '',
+      const form = this._appendForm(sSchema, {
+        name: source.name || '', icon: this._iconHtml(source.icon), username: source.username || '',
         connect_entity: source.connect_entity || '',
         spotify_entity: source.spotify_entity || '',
       }, (value) => {
@@ -352,27 +352,27 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         if (value.spotify_entity) entry.spotify_entity = value.spotify_entity;
         this._cfg.music_sources = (this._cfg.music_sources || []).slice();
         this._cfg.music_sources[index] = entry;
-        this._melden();
+        this._emitConfigChange();
       });
-      sVak.appendChild(this._paneel(source.name || ed.naamloos, form, () => {
+      sourceSection.appendChild(this._addPanel(source.name || editorText.naamloos, form, () => {
         this._cfg.music_sources = (this._cfg.music_sources || [])
           .filter((item, itemIndex) => itemIndex !== index);
         if (!this._cfg.music_sources.length) delete this._cfg.music_sources;
-        this._herbouw();
+        this._rebuildEditor();
       }));
     });
-    sVak.appendChild(this._knop(ed.sourceToe, '', () => {
+    sourceSection.appendChild(this._addButton(editorText.sourceToe, '', () => {
       this._cfg.music_sources = (this._cfg.music_sources || [])
         .concat([{ name: '', username: '', icon: 'mdi:spotify' }]);
-      this._herbouw();
+      this._rebuildEditor();
     }));
-    wortel.appendChild(sVak);
+    root.appendChild(sourceSection);
 
-    // ---- categorieen ----
-    const cVak = document.createElement('div');
-    cVak.className = 'vak';
-    cVak.innerHTML = `<div class="kop">${ed.cats}</div>`;
-    const cats = c.categories || [];
+    // ---- categories ----
+    const categorySection = document.createElement('div');
+    categorySection.className = 'section';
+    categorySection.innerHTML = `<div class="heading">${editorText.cats}</div>`;
+    const cats = config.categories || [];
     const tSchema = [
       { name: '', type: 'grid', schema: [
         { name: 'name', selector: { text: {} } },
@@ -386,33 +386,33 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
       ] },
     ];
     cats.forEach((cat, ci) => {
-      const binnen = document.createElement('div');
+      const contentSection = document.createElement('div');
       const auto = !!cat.source;
       // The one question that decides what the rest of this panel looks like:
       // do you write the list, or does Music Assistant.
-      binnen.appendChild(this._form(
+      contentSection.appendChild(this._appendForm(
         [
           { name: 'name', selector: { text: {} } },
-          { name: 'vullen', selector: { select: { mode: 'dropdown', options: [
-            { value: 'hand', label: ed.bronHand },
-            { value: 'auto', label: ed.bronAuto },
+          { name: 'fill_source', selector: { select: { mode: 'dropdown', options: [
+            { value: 'hand', label: editorText.bronHand },
+            { value: 'auto', label: editorText.bronAuto },
           ] } } },
         ],
-        { name: cat.name || '', vullen: auto ? 'auto' : 'hand' },
+        { name: cat.name || '', fill_source: auto ? 'auto' : 'hand' },
         (v) => {
-          const lijst = (this._cfg.categories || []).slice();
-          const nw = Object.assign({}, lijst[ci], { name: v.name });
-          const wilAuto = v.vullen === 'auto';
-          if (wilAuto && !nw.source) {
-            nw.source = { media_type: 'playlist', limit: 12, order_by: 'last_played_desc' };
-            delete nw.tiles;
-          } else if (!wilAuto && nw.source) {
-            delete nw.source;
-            nw.tiles = nw.tiles || [];
+          const categoriesCopy = (this._cfg.categories || []).slice();
+          const updatedCategory = Object.assign({}, categoriesCopy[ci], { name: v.name });
+          const wantsAutomaticSource = v.fill_source === 'auto';
+          if (wantsAutomaticSource && !updatedCategory.source) {
+            updatedCategory.source = { media_type: 'playlist', limit: 12, order_by: 'last_played_desc' };
+            delete updatedCategory.tiles;
+          } else if (!wantsAutomaticSource && updatedCategory.source) {
+            delete updatedCategory.source;
+            updatedCategory.tiles = updatedCategory.tiles || [];
           }
-          lijst[ci] = nw;
-          this._cfg.categories = lijst;
-          if (wilAuto !== auto) this._herbouw(); else this._melden();
+          categoriesCopy[ci] = updatedCategory;
+          this._cfg.categories = categoriesCopy;
+          if (wantsAutomaticSource !== auto) this._rebuildEditor(); else this._emitConfigChange();
         }
       ));
       if (auto) {
@@ -421,10 +421,10 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         const sourceFields = [
           { name: '', type: 'grid', schema: [
             { name: 'media_type', selector: { select: { mode: 'dropdown', options: [
-              { value: 'recommendations', label: ed.recommendations },
-              { value: 'playlist', label: sn.playlist }, { value: 'album', label: sn.album },
-              { value: 'artist', label: sn.artist }, { value: 'track', label: sn.track },
-              { value: 'radio', label: sn.radio },
+              { value: 'recommendations', label: editorText.recommendations },
+              { value: 'playlist', label: mediaTypeLabels.playlist }, { value: 'album', label: mediaTypeLabels.album },
+              { value: 'artist', label: mediaTypeLabels.artist }, { value: 'track', label: mediaTypeLabels.track },
+              { value: 'radio', label: mediaTypeLabels.radio },
             ] } } },
             { name: 'count', selector: { number: { min: 1, max: 100, step: 1, mode: 'box' } } },
           ] },
@@ -432,16 +432,16 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         if (type !== 'recommendations') {
           sourceFields.push(
             { name: 'order_by', selector: { select: { mode: 'dropdown', options: [
-              { value: '', label: ed.ordStandaard },
-              { value: 'last_played_desc', label: ed.ordRecent },
-              { value: 'timestamp_added_desc', label: ed.ordNieuw },
-              { value: 'random', label: ed.ordRandom },
+              { value: '', label: editorText.ordStandaard },
+              { value: 'last_played_desc', label: editorText.ordRecent },
+              { value: 'timestamp_added_desc', label: editorText.ordNieuw },
+              { value: 'random', label: editorText.ordRandom },
             ] } } },
             { name: 'favorite', selector: { boolean: {} } },
             { name: 'play', selector: { boolean: {} } },
           );
         }
-        binnen.appendChild(this._form(
+        contentSection.appendChild(this._appendForm(
           sourceFields,
           {
             media_type: type,
@@ -451,79 +451,79 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
             play: br.play === true,
           },
           (v) => {
-            const nieuwType = v.media_type !== type;
+            const mediaTypeChanged = v.media_type !== type;
             const recommendations = v.media_type === 'recommendations';
-            const bron = {
+            const sourceConfig = {
               media_type: v.media_type,
               limit: v.count || (recommendations ? 9 : 12),
             };
             if (!recommendations) {
-              if (v.order_by) bron.order_by = v.order_by;
-              if (v.favorite) bron.favorite = true;
-              if (v.play) bron.play = true;
+              if (v.order_by) sourceConfig.order_by = v.order_by;
+              if (v.favorite) sourceConfig.favorite = true;
+              if (v.play) sourceConfig.play = true;
             }
-            const lijst = (this._cfg.categories || []).slice();
-            lijst[ci] = Object.assign({}, lijst[ci], { source: bron });
-            this._cfg.categories = lijst;
-            if (nieuwType) this._herbouw(); else this._melden();
+            const categoriesCopy = (this._cfg.categories || []).slice();
+            categoriesCopy[ci] = Object.assign({}, categoriesCopy[ci], { source: sourceConfig });
+            this._cfg.categories = categoriesCopy;
+            if (mediaTypeChanged) this._rebuildEditor(); else this._emitConfigChange();
           }
         ));
       }
-      const tegels = document.createElement('div');
-      tegels.className = 'tegels';
-      (auto ? [] : cat.tiles || []).forEach((tg, ti) => {
-        const rij = document.createElement('div');
-        rij.className = 'tegel';
-        rij.appendChild(this._form(tSchema, {
-          name: tg.name || '', icon: this._mdi(tg.icon), uri: tg.uri || '',
-          image: tg.image || '', play: !!tg.play, radio_mode: !!tg.radio_mode,
+      const tileList = document.createElement('div');
+      tileList.className = 'tiles';
+      (auto ? [] : cat.tiles || []).forEach((tile, tileIndex) => {
+        const tileRow = document.createElement('div');
+        tileRow.className = 'tile';
+        tileRow.appendChild(this._appendForm(tSchema, {
+          name: tile.name || '', icon: this._iconHtml(tile.icon), uri: tile.uri || '',
+          image: tile.image || '', play: !!tile.play, radio_mode: !!tile.radio_mode,
         }, (v) => {
-          const nt = { name: v.name, uri: v.uri };
-          if (v.image) nt.image = v.image;
-          else if (v.icon) nt.icon = v.icon;
-          if (v.play) nt.play = true;
-          if (v.radio_mode) nt.radio_mode = true;
-          const lijst = (this._cfg.categories[ci].tiles || []).slice();
-          lijst[ti] = nt;
-          this._cfg.categories[ci] = Object.assign({}, this._cfg.categories[ci], { tiles: lijst });
-          this._melden();
+          const tileConfig = { name: v.name, uri: v.uri };
+          if (v.image) tileConfig.image = v.image;
+          else if (v.icon) tileConfig.icon = v.icon;
+          if (v.play) tileConfig.play = true;
+          if (v.radio_mode) tileConfig.radio_mode = true;
+          const tileConfigs = (this._cfg.categories[ci].tiles || []).slice();
+          tileConfigs[tileIndex] = tileConfig;
+          this._cfg.categories[ci] = Object.assign({}, this._cfg.categories[ci], { tiles: tileConfigs });
+          this._emitConfigChange();
         }));
-        const wr = document.createElement('div');
-        wr.className = 'rij';
-        wr.appendChild(this._knop(ed.weg, 'weg', () => {
-          this._cfg.categories[ci].tiles = (cat.tiles || []).filter((x, k) => k !== ti);
-          this._herbouw();
+        const actionRow = document.createElement('div');
+        actionRow.className = 'row';
+        actionRow.appendChild(this._addButton(editorText.weg, 'remove', () => {
+          this._cfg.categories[ci].tiles = (cat.tiles || []).filter((x, k) => k !== tileIndex);
+          this._rebuildEditor();
         }));
-        rij.appendChild(wr);
-        tegels.appendChild(rij);
+        tileRow.appendChild(actionRow);
+        tileList.appendChild(tileRow);
       });
-      binnen.appendChild(tegels);
+      contentSection.appendChild(tileList);
       if (!auto) {
-        binnen.appendChild(this._knop(ed.tegelToe, '', () => {
+        contentSection.appendChild(this._addButton(editorText.tegelToe, '', () => {
           this._cfg.categories[ci].tiles = (cat.tiles || []).concat([{ name: '', uri: '' }]);
-          this._herbouw();
+          this._rebuildEditor();
         }));
       }
-      const kop = (cat.name || ed.naamloos) + '  ·  ' + (auto
-        ? ed.autoTegels
-        : ((cat.tiles || []).length) + ' ' + ed.tegels.toLowerCase());
-      cVak.appendChild(this._paneel(kop, binnen, () => {
+      const panelTitle = (cat.name || editorText.naamloos) + '  ·  ' + (auto
+        ? editorText.autoTegels
+        : ((cat.tiles || []).length) + ' ' + editorText.tegels.toLowerCase());
+      categorySection.appendChild(this._addPanel(panelTitle, contentSection, () => {
         this._cfg.categories = cats.filter((x, k) => k !== ci);
         if (!this._cfg.categories.length) delete this._cfg.categories;
-        this._herbouw();
+        this._rebuildEditor();
       }));
     });
-    cVak.appendChild(this._knop(ed.catToe, '', () => {
+    categorySection.appendChild(this._addButton(editorText.catToe, '', () => {
       this._cfg.categories = (this._cfg.categories || []).concat([{ name: '', tiles: [] }]);
-      this._herbouw();
+      this._rebuildEditor();
     }));
-    wortel.appendChild(cVak);
+    root.appendChild(categorySection);
 
-    // ---- navigatieknoppen ----
-    const lVak = document.createElement('div');
-    lVak.className = 'vak';
-    lVak.innerHTML = `<div class="kop">${ed.links}</div>`;
-    const links = c.links || [];
+    // ---- navigation buttons ----
+    const navigationSection = document.createElement('div');
+    navigationSection.className = 'section';
+    navigationSection.innerHTML = `<div class="heading">${editorText.links}</div>`;
+    const links = config.links || [];
     const lSchema = [
       { name: '', type: 'grid', schema: [
         { name: 'name', selector: { text: {} } },
@@ -532,23 +532,23 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
       { name: 'path', selector: { text: {} } },
     ];
     links.forEach((l, li) => {
-      const form = this._form(lSchema,
-        { name: l.name || '', icon: this._mdi(l.icon), path: l.path || '' },
+      const form = this._appendForm(lSchema,
+        { name: l.name || '', icon: this._iconHtml(l.icon), path: l.path || '' },
         (v) => {
           this._cfg.links = (this._cfg.links || []).slice();
           this._cfg.links[li] = { name: v.name, icon: v.icon, path: v.path };
-          this._melden();
+          this._emitConfigChange();
         });
-      lVak.appendChild(this._paneel(l.name || ed.naamloos, form, () => {
+      navigationSection.appendChild(this._addPanel(l.name || editorText.naamloos, form, () => {
         this._cfg.links = links.filter((x, k) => k !== li);
         if (!this._cfg.links.length) delete this._cfg.links;
-        this._herbouw();
+        this._rebuildEditor();
       }));
     });
-    lVak.appendChild(this._knop(ed.linkToe, '', () => {
+    navigationSection.appendChild(this._addButton(editorText.linkToe, '', () => {
       this._cfg.links = (this._cfg.links || []).concat([{ name: '', icon: 'mdi:home', path: '' }]);
-      this._herbouw();
+      this._rebuildEditor();
     }));
-    wortel.appendChild(lVak);
+    root.appendChild(navigationSection);
   }
 }

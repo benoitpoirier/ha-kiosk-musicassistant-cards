@@ -1,4 +1,4 @@
-import { VEILIG, VOL_CSS, esc, svg, taalVan, volBind, volHtml, volShow } from './shared.js';
+import { safeImageUrl, VOLUME_CSS, esc, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay } from './shared.js';
 import { THEME_COLORS } from './kiosk-theme.js';
 
 const DOMAIN = 'kiosk_musicassistant_cards';
@@ -220,8 +220,8 @@ export class KioskNowPlayingCard extends HTMLElement {
     return found;
   }
 
-  _t() {
-    const lang = taalVan(this._cfg.language, this._hass && this._hass.language);
+  _getTranslations() {
+    const lang = getLanguage(this._cfg.language, this._hass && this._hass.language);
     return Object.assign({}, lang.np, {
       stil: lang.stil, shuffle: lang.shuffleTitel, repeat: lang.herhaalTitel, tracks: lang.nummers, track1: lang.nummer,
     });
@@ -258,8 +258,8 @@ export class KioskNowPlayingCard extends HTMLElement {
 
   _build() {
     const height = Math.max(420, Math.min(780, Number(this._cfg.height) || 560));
-    const t = this._t();
-    this.shadowRoot.innerHTML = `<style>${NOW_PLAYING_STYLE}${VOL_CSS}</style>
+    const t = this._getTranslations();
+    this.shadowRoot.innerHTML = `<style>${NOW_PLAYING_STYLE}${VOLUME_CSS}</style>
       <section class="shell" style="--now-playing-height:${height}px;${this._themeStyle()}">
         <div class="background" id="background"></div><div class="shade"></div>
         <div class="layout">
@@ -298,7 +298,7 @@ export class KioskNowPlayingCard extends HTMLElement {
     this.shadowRoot.addEventListener('scroll', (event) => {
       if (event.target && event.target.id === 'q-list') this._queueScroll();
     }, true);
-    volBind(this.shadowRoot, {
+    bindVolumeControl(this.shadowRoot, {
       step: () => this._volumeStep(),
       send: (percent) => {
         if (!this._entity || !this._hass) return;
@@ -375,7 +375,7 @@ export class KioskNowPlayingCard extends HTMLElement {
         .replace(/[-_]+/g, ' ').replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
     }
     if (attributes.active_queue) return 'Music Assistant';
-    return String(attributes.source || attributes.app_id || this._t().external);
+    return String(attributes.source || attributes.app_id || this._getTranslations().external);
   }
 
   _favoriteAccount(provider) {
@@ -411,7 +411,7 @@ export class KioskNowPlayingCard extends HTMLElement {
       // A new track: reopen the list on it.
       if (this._queueOpen && queueContextKey) Promise.resolve().then(() => { if (this._queueOpen) this._refreshQueue(); });
     }
-    const picture = VEILIG(attributes.entity_picture_local || attributes.entity_picture || '');
+    const picture = safeImageUrl(attributes.entity_picture_local || attributes.entity_picture || '');
     const signature = [entity, state && state.state, attributes.media_title, attributes.media_artist,
       attributes.media_album_name, attributes.media_content_id,
       picture.replace(/([?&])(token|cache)=[^&]*/g, '$1'), attributes.active_queue,
@@ -448,7 +448,7 @@ export class KioskNowPlayingCard extends HTMLElement {
   _queueRowHtml(item, t) {
     const current = this._qs && item.index === this._qs.current;
     const played = this._qs && this._qs.current != null && item.index < this._qs.current;
-    const image = VEILIG(item.image || '');
+    const image = safeImageUrl(item.image || '');
     return `<div class="q-row${current ? ' now' : ''}${played ? ' played' : ''}" data-q="${item.index}">
       ${image ? `<img alt="" loading="lazy" src="${esc(image)}">` : `<span class="q-ph">${svg('mdi:music')}</span>`}
       <div class="q-tx">${current ? `<div class="q-label">${esc(t.nowLabel)}</div>` : ''}
@@ -540,7 +540,7 @@ export class KioskNowPlayingCard extends HTMLElement {
     qs.start = Number(page.offset) || 0;
     qs.total = Number(page.total) || 0;
     qs.current = page.current_index;
-    const t = this._t();
+    const t = this._getTranslations();
     const rows = this.shadowRoot.getElementById('q-rows');
     if (!rows || !qs.items.length) { this._loadQueue(); return; }
     rows.innerHTML = qs.items.filter((item) => item.index >= this._queueFloor())
@@ -599,13 +599,13 @@ export class KioskNowPlayingCard extends HTMLElement {
     }
     setTimeout(() => row.remove(), 450);
     const head = this.shadowRoot.getElementById('q-head');
-    const t = this._t();
+    const t = this._getTranslations();
     if (head) head.textContent = this._queueCountText(t);
   }
 
   async _queueMore(direction) {
     const qs = this._qs;
-    const t = this._t();
+    const t = this._getTranslations();
     qs.loading = direction > 0 ? 'down' : 'up';
     const offset = direction > 0 ? qs.start + qs.items.length : Math.max(this._queueFloor(), qs.start - QUEUE_PAGE);
     const limit = direction > 0 ? QUEUE_PAGE : qs.start - offset;
@@ -654,14 +654,14 @@ export class KioskNowPlayingCard extends HTMLElement {
 
   _syncVolume(attributes) {
     const volume = Number(attributes.volume_level);
-    if (Number.isFinite(volume)) volShow(this.shadowRoot, volume * 100, 100);
+    if (Number.isFinite(volume)) updateVolumeDisplay(this.shadowRoot, volume * 100, 100);
   }
   _render(state, attributes, picture) {
     const entity = this._entity;
     const configured = this._players.find((player) => player.entity === entity) || {};
     const playing = state && ['playing', 'buffering'].includes(state.state);
     const paused = state && state.state === 'paused';
-    const t = this._t();
+    const t = this._getTranslations();
     const $ = (id) => this.shadowRoot.getElementById(id);
     const title = attributes.media_title || t.stil;
     const artist = attributes.media_artist || '';
@@ -759,7 +759,7 @@ export class KioskNowPlayingCard extends HTMLElement {
     const hasVolume = this._supports(attributes, 4) && Number.isFinite(Number(attributes.volume_level));
     this._patch('volume-row', hasVolume ? `
       <button class="btn" data-vol="-1" title="${esc(t.volDown)}" aria-label="${esc(t.volDown)}">${svg('mdi:volume-minus')}</button>
-      ${volHtml('Volume')}
+      ${volumeControlHtml('Volume')}
       <button class="btn" data-vol="1" title="${esc(t.volUp)}" aria-label="${esc(t.volUp)}">${svg('mdi:volume-plus')}</button>
       <span class="vol-label"></span>` : '');
     $('bottom').hidden = !hasVolume;    if ($('notice').textContent !== this._notice) $('notice').textContent = this._notice;
@@ -998,6 +998,6 @@ export class KioskNowPlayingCard extends HTMLElement {
 
 
 // ---------------------------------------------------------------------------
-// Visuele instellingen. Alles met keuzelijsten en invulvelden; YAML hoeft niet.
+// Visual settings. All options use selectors and input fields; no YAML needed.
 // ---------------------------------------------------------------------------
 

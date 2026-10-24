@@ -1,11 +1,11 @@
 // Shared utilities, Music Assistant labels, and defaults.
 
-export const KLEIN = (u) => (u || '')
+export const SMALL_IMAGE_URL = (u) => (u || '')
   .replace('ab67616d0000b273', 'ab67616d00004851')
   .replace('ab67616d00001e02', 'ab67616d00004851')
   .replace('mosaic.scdn.co/640/', 'mosaic.scdn.co/60/');
 
-export const GROOT = (u) => (u || '')
+export const LARGE_IMAGE_URL = (u) => (u || '')
   .replace('ab67616d0000b273', 'ab67616d00001e02')
   .replace('mosaic.scdn.co/640/', 'mosaic.scdn.co/300/');
 
@@ -13,7 +13,7 @@ export const esc = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;');
 
-export const SPEELT = ['playing', 'paused', 'buffering'];
+export const PLAYING_STATES = ['playing', 'paused', 'buffering'];
 
 // Music Assistant serves the covers it proxies itself over plain http, on its
 // own address. On a dashboard opened over https - Nabu Casa, a reverse proxy -
@@ -26,7 +26,7 @@ export const SPEELT = ['playing', 'paused', 'buffering'];
 // imageproxy on http://192.168.x.x:8095 - has no https twin, so it is dropped
 // and the tile falls back to its icon.
 const LOKAAL = /^(localhost|\d{1,3}(\.\d{1,3}){3}|\[[0-9a-f:]+\]|[^.]+|.+\.(local|lan|home|internal))$/i;
-export const VEILIG = (u) => {
+export const safeImageUrl = (u) => {
   const s = String(u || '');
   if (!s) return '';
   const https = typeof location !== 'undefined' && location.protocol === 'https:';
@@ -38,8 +38,8 @@ export const VEILIG = (u) => {
 
 // A Music Assistant uri is <provider>://<type>/<id>. The type is the half that
 // tells us which library to look in.
-export const SOORT_VAN = (uri) => ((uri || '').split('://')[1] || '').split('/')[0] || '';
-export const SPOTIFY_URI = (uri) => {
+export const mediaTypeFromUri = (uri) => ((uri || '').split('://')[1] || '').split('/')[0] || '';
+export const normalizeSpotifyUri = (uri) => {
   const value = String(uri || '');
   const match = value.match(/^spotify:(track|album|artist|playlist):([^?]+)/i);
   return match ? `spotify://${match[1]}/${match[2]}` : value;
@@ -50,25 +50,25 @@ export const SPOTIFY_URI = (uri) => {
 // the card hangs on the wire, too long and a new playlist stays invisible.
 export const BIB_TTL = 10 * 60 * 1000;
 export const BIB_MAX = 500;
-const CATEGORIES_PAR_DEFAUT = [
+const DEFAULT_CATEGORIES = [
   { media_type: 'recommendations', limit: 9 },
   { media_type: 'playlist', order_by: 'last_played_desc', limit: 12 },
   { media_type: 'playlist', order_by: 'timestamp_added_desc', limit: 12 },
   { media_type: 'playlist', order_by: 'name', limit: 24 },
 ];
-export const categoriesParDefaut = (language) => {
-  const names = taalVan(language).standaardCats;
-  return CATEGORIES_PAR_DEFAUT.map((source, index) => ({
+export const defaultCategories = (language) => {
+  const names = getLanguage(language).standaardCats;
+  return DEFAULT_CATEGORIES.map((source, index) => ({
     name: names[index],
     source: { ...source },
   }));
 };
 
-export const SOORTEN = [
-  { key: 'track', lijst: true, veld: 'tracks' },
-  { key: 'album', lijst: false, veld: 'albums' },
-  { key: 'artist', lijst: false, veld: 'artists' },
-  { key: 'playlist', lijst: false, veld: 'playlists' },
+export const MEDIA_TYPES = [
+  { key: 'track', isList: true, responseKey: 'tracks' },
+  { key: 'album', isList: false, responseKey: 'albums' },
+  { key: 'artist', isList: false, responseKey: 'artists' },
+  { key: 'playlist', isList: false, responseKey: 'playlists' },
 ];
 
 // Interface strings. The card picks the language of Home Assistant, or the
@@ -90,6 +90,19 @@ export const TAAL = {
     speler: 'Player',
     standaardCats: ['Top picks for you', 'Recently played', 'Recently added', 'Playlists'],
     ontdek: 'Discover', ontdekKop: 'Picked for you', ontdekLeeg: 'No recommendations yet. Play some music and come back later.',
+    launch: {
+      eyebrow: 'PLAYBACK', title: 'Starting your track', success: 'Playback confirmed',
+      player: 'On {player}', hide: 'Hide progress', elapsed: '{seconds} s elapsed',
+      steps: [
+        { title: 'Prepare the player', detail: 'Apply configured zone and group actions, if needed' },
+        { title: 'Check the volume', detail: 'Adjust only if it exceeds the configured limit' },
+        { title: 'Send the track to Music Assistant', detail: 'Home Assistant forwards the selected track' },
+        { title: 'Confirm playback', detail: 'Wait for this player to report the selected track as playing' },
+      ],
+      status: ['Preparing the selected zone…', 'Checking the configured volume limit…',
+        'Music Assistant is processing the request…', 'Waiting for the player to confirm playback…',
+        'Playback confirmed'],
+    },
     luister: 'Play', opnieuw: 'Refresh', spelerTonen: 'Show player', spelerVerbergen: 'Hide player', voorJou: 'Recommended for you', zoektVoorJou: 'Finding new music for you…', omdat: 'Because you listen to {x}',
     type1: { track: 'Track', album: 'Album', artist: 'Artist', playlist: 'Playlist', radio: 'Radio', podcast: 'Podcast', audiobook: 'Audiobook' },
     rijNamen: {},
@@ -159,6 +172,19 @@ export const TAAL = {
     speler: 'Speler',
     standaardCats: ['Topkeuzes voor jou', 'Onlangs gespeeld', 'Onlangs toegevoegd', 'Playlists'],
     ontdek: 'Ontdekken', ontdekKop: 'Voor jou gekozen', ontdekLeeg: 'Nog geen aanbevelingen. Speel wat muziek en kom later terug.',
+    launch: {
+      eyebrow: 'AFSPELEN', title: 'Nummer starten', success: 'Afspelen bevestigd',
+      player: 'Op {player}', hide: 'Voortgang verbergen', elapsed: '{seconds} s verstreken',
+      steps: [
+        { title: 'Speler voorbereiden', detail: 'Ingestelde zone- en groepsacties uitvoeren indien nodig' },
+        { title: 'Volume controleren', detail: 'Alleen aanpassen als de ingestelde limiet wordt overschreden' },
+        { title: 'Nummer naar Music Assistant sturen', detail: 'Home Assistant verstuurt het geselecteerde nummer' },
+        { title: 'Afspelen bevestigen', detail: 'Wachten tot deze speler het nummer als afspelend meldt' },
+      ],
+      status: ['De gekozen zone voorbereiden…', 'De ingestelde volumelimiet controleren…',
+        'Music Assistant verwerkt de aanvraag…', 'Wachten op bevestiging van de speler…',
+        'Afspelen bevestigd'],
+    },
     luister: 'Afspelen', opnieuw: 'Vernieuwen', spelerTonen: 'Speler tonen', spelerVerbergen: 'Speler verbergen', voorJou: 'Aanbevolen voor jou', zoektVoorJou: 'Nieuwe muziek zoeken…', omdat: 'Omdat je {x} luistert',
     type1: { track: 'Nummer', album: 'Album', artist: 'Artiest', playlist: 'Playlist', radio: 'Radio', podcast: 'Podcast', audiobook: 'Luisterboek' },
     rijNamen: {
@@ -245,6 +271,19 @@ export const TAAL = {
     speler: 'Lecteur',
     standaardCats: ['Meilleures sélections pour vous', 'Récemment écoutés', 'Récemment ajoutés', 'Playlists'],
     ontdek: 'Découvertes', ontdekKop: 'Sélectionné pour vous', ontdekLeeg: 'Pas encore de recommandations. Écoutez de la musique et revenez plus tard.',
+    launch: {
+      eyebrow: 'LECTURE', title: 'Démarrage du morceau', success: 'Lecture confirmée',
+      player: 'Sur {player}', hide: 'Masquer la progression', elapsed: '{seconds} s écoulées',
+      steps: [
+        { title: 'Préparation du lecteur', detail: 'Application des réglages de zone et de groupe, si nécessaire' },
+        { title: 'Vérification du volume', detail: 'Ajustement uniquement si la limite configurée est dépassée' },
+        { title: 'Envoi du titre à Music Assistant', detail: 'Home Assistant transmet le titre sélectionné' },
+        { title: 'Confirmation de lecture', detail: 'Attente de l’état « en lecture » pour ce titre sur ce lecteur' },
+      ],
+      status: ['Préparation de la zone sélectionnée…', 'Vérification de la limite de volume…',
+        'Music Assistant traite la demande…', 'Attente de la confirmation du lecteur…',
+        'Lecture confirmée'],
+    },
     luister: 'Écouter', opnieuw: 'Actualiser', spelerTonen: 'Afficher le lecteur', spelerVerbergen: 'Masquer le lecteur', voorJou: 'Recommandé pour vous', zoektVoorJou: 'Recherche de nouveautés pour vous…', omdat: 'Parce que vous écoutez {x}',
     type1: { track: 'Titre', album: 'Album', artist: 'Artiste', playlist: 'Playlist', radio: 'Radio', podcast: 'Podcast', audiobook: 'Livre audio' },
     rijNamen: {
@@ -320,15 +359,15 @@ export const TAAL = {
 };
 
 // Language from the card config, else Home Assistant's, else English.
-export const taalVan = (...kandidaten) => {
+export const getLanguage = (...kandidaten) => {
   const g = String(kandidaten.find(Boolean) || 'en').slice(0, 2).toLowerCase();
   return TAAL[g] || TAAL.en;
 };
 
-export const RIJEN = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+export const KEYBOARD_ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
 
 
-export const KORT = {
+export const ICON_ALIASES = {
   soundbar: 'mdi:soundbar', speaker: 'mdi:speaker', groep: 'mdi:surround-sound',
   keuken: 'mdi:countertop', serre: 'mdi:greenhouse',
   min: 'mdi:volume-minus', plus: 'mdi:volume-plus', shuffle: 'mdi:shuffle-variant',
@@ -342,11 +381,11 @@ export const KORT = {
 
 export const svg = (naam) => {
   const n = String(naam || 'muziek');
-  const mdi = n.indexOf(':') > 0 ? n : (KORT[n] || 'mdi:music');
+  const mdi = n.indexOf(':') > 0 ? n : (ICON_ALIASES[n] || 'mdi:music');
   return `<ha-icon icon="${esc(mdi)}"></ha-icon>`;
 };
 
-export const mmss = (s) => {
+export const formatDuration = (s) => {
   const n = parseInt(s, 10);
   if (!n || n < 0) return '';
   const m = Math.floor(n / 60);
@@ -362,7 +401,7 @@ export const mmss = (s) => {
 // only moving it does, and a vertical swipe still scrolls the page. The value is sent while dragging
 // (at most 4 times a second) and once more on release; incoming state does not
 // move the slider while it is being touched or for 2 s after.
-export const VOL_CSS = `
+export const VOLUME_CSS = `
 .vol-box { position:relative; flex:1 1 auto; min-width:60px; height:48px; display:flex; align-items:center;
   touch-action:pan-y; cursor:grab; -webkit-user-select:none; user-select:none;
   --v:0%; --vr-track:8px; --vr-thumb:24px; }
@@ -387,7 +426,7 @@ export const VOL_CSS = `
 .vol-box.vol-active .vol-bubble { opacity:1; transform:translateX(-50%) scale(1); }
 `;
 
-export const volHtml = (label) => `<div class="vol-box"><input class="vol-range" type="range" min="0" max="100"
+export const volumeControlHtml = (label) => `<div class="vol-box"><input class="vol-range" type="range" min="0" max="100"
   step="1" value="0" aria-label="${esc(label)}"><output class="vol-bubble"></output></div>`;
 
 const volPaint = (range) => {
@@ -402,7 +441,7 @@ const volPaint = (range) => {
 };
 
 // Shows the player's volume (percent) unless the slider is being touched.
-export const volShow = (root, percent, max) => {
+export const updateVolumeDisplay = (root, percent, max) => {
   const range = root.querySelector('.vol-range');
   if (!range) return;
   if (max && range.max !== String(max)) range.max = String(max);
@@ -416,7 +455,7 @@ export const volShow = (root, percent, max) => {
 
 // Wires every .vol-range and [data-vol] button inside root. send(percent) sets
 // the volume; step() returns the button step in percent.
-export const volBind = (root, { send, step }) => {
+export const bindVolumeControl = (root, { send, step }) => {
   let last = 0;
   let timer = null;
   let hold = null;
