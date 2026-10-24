@@ -9,6 +9,20 @@ The package is a Home Assistant custom integration that:
 - serves and automatically loads the cards in the Home Assistant frontend (no manual Lovelace resource needed);
 - exposes helper actions that reuse Home Assistant's already authenticated Music Assistant client, so no Music Assistant token is ever sent to the browser.
 
+## Why you will like it
+
+- **Multi-player**: group your speakers in zones and switch between them with one tap. The card follows whichever player is playing.
+- **Multi-source**: browse and search the whole Music Assistant library (Spotify, Tidal, YouTube Music, Deezer, local files, radios...) from one place. Each source can be tied to a Music Assistant user, so every family member gets their own library and recommendations.
+- **Discover tab**: fresh recommendations right in the browser, built from similar tracks of your listening history and from Music Assistant's own rows. It works with any provider and does not require Spotify.
+- **Smart queue**: play a single track and similar tracks are queued behind it once it has started, so the music never stops and playback is never delayed.
+- **Now playing with a real queue**: preview the queue, remove tracks, and see what is coming next, in a full-screen player.
+- **Synchronised lyrics** that scroll with the music, shown only when time-coded lyrics are available.
+- **8 colour themes** (sunset, spotify, ocean, aurora, neon, ember, graphite, daylight), with accents shared by both cards.
+- **Touch first**: big targets, an on-screen keyboard for search, a light non-blocking playback pill, and a layout tuned for 1280×800 kiosks that also adapts to phones in portrait.
+- **Fully configurable**: a visual editor for the browser card and plain YAML options for everything else (zones, sources, categories, theme, language, height, discovery, queue behaviour...).
+- **Zero setup on the frontend**: installed through HACS, loaded automatically, no Lovelace resource to add and no build step. Available in English, French and Dutch.
+- **Safe by design**: Music Assistant's token never reaches the browser; the cards reuse Home Assistant's authenticated client.
+
 ## Screenshots
 
 Browser card (1280×800 kiosk):
