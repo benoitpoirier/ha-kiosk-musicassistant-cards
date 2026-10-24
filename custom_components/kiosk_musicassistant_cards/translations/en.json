@@ -129,6 +129,10 @@
         "username": {
           "name": "Music Assistant user",
           "description": "Optional Music Assistant user to play as."
+        },
+        "autofill_similar": {
+          "name": "Add similar tracks",
+          "description": "Once the track plays, queue similar tracks if it is alone in the queue."
         }
       }
     },

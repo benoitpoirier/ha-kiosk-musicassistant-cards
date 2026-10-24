@@ -129,6 +129,10 @@
         "username": {
           "name": "Utilisateur Music Assistant",
           "description": "Utilisateur Music Assistant facultatif pour la lecture."
+        },
+        "autofill_similar": {
+          "name": "Ajouter des titres similaires",
+          "description": "Une fois le titre lancé, ajoute des titres similaires à la file s'il y est seul."
         }
       }
     },

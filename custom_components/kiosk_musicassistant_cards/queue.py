@@ -15,6 +15,8 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from music_assistant_models.queue_item import QueueItem
 
+from .recommendations import _async_similar, _portable_uri, _seed_from_uri
+
 _LOGGER = logging.getLogger(__name__)
 
 PAGE_SIZE = 25
@@ -190,8 +192,15 @@ PLAY_NOW_SCHEMA = vol.Schema(
         vol.Required("entity_id"): cv.entity_id,
         vol.Required("uri"): cv.string,
         vol.Optional("username"): cv.string,
+        vol.Optional("autofill_similar", default=False): cv.boolean,
     }
 )
+
+# Similar tracks are added once the track plays, never before: looking them up
+# can take seconds and must not delay the start of playback.
+AUTOFILL_COUNT = 10
+AUTOFILL_WAIT = 30
+AUTOFILL_SETTLE = 2
 
 
 async def async_play_now(call: ServiceCall) -> None:
@@ -228,6 +237,63 @@ async def async_play_now(call: ServiceCall) -> None:
             _remove_previous_item(mass, queue_id, previous),
             "kiosk_musicassistant_cards remove previous track",
         )
+    if call.data["autofill_similar"] and mass is not None:
+        hass.async_create_background_task(
+            _autofill_similar(hass, mass, entity_id, call.data["uri"], extra, player, generation),
+            "kiosk_musicassistant_cards autofill similar",
+        )
+
+
+async def _autofill_similar(
+    hass: Any, mass: Any, entity_id: str, uri: str, extra: dict[str, str],
+    player: dict[str, Any], generation: int,
+) -> None:
+    """Queue tracks similar to `uri` when it is alone in the queue, once it plays."""
+    seed = _seed_from_uri(uri, "", None)
+    if seed is None:
+        return  # albums, playlists and radio stations bring their own queue
+    queue_id = None
+    for _ in range(AUTOFILL_WAIT):
+        if generation != player["generation"]:
+            return
+        state = hass.states.get(entity_id)
+        if state is not None and state.state == "playing":
+            queue_id = state.attributes.get("active_queue")
+            break
+        await asyncio.sleep(1)
+    if not queue_id:
+        return
+    # Lets the replaced track leave the queue before counting.
+    await asyncio.sleep(AUTOFILL_SETTLE)
+    queue = mass.player_queues.get(queue_id)
+    if generation != player["generation"] or queue is None or (queue.items or 0) > 1:
+        return
+    try:
+        raw_items = await _async_similar(mass, extra.get("username"), seed)
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.debug("Similar tracks for %s failed: %s", uri, err)
+        return
+    uris: list[str] = []
+    for raw in raw_items:
+        similar = _portable_uri(raw.get("uri") or "") if isinstance(raw, dict) else ""
+        if similar and similar != _portable_uri(uri) and similar not in uris:
+            uris.append(similar)
+        if len(uris) == AUTOFILL_COUNT:
+            break
+    if not uris:
+        return
+    async with player["lock"]:
+        # A newer tap, or tracks added meanwhile, make the suggestion obsolete.
+        if generation != player["generation"] or (queue.items or 0) > 1:
+            return
+        try:
+            await hass.services.async_call(
+                "music_assistant", "play_media",
+                {"media_id": uris, "enqueue": "add", **extra},
+                target={"entity_id": entity_id}, blocking=True,
+            )
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Could not queue similar tracks on %s: %s", entity_id, err)
 
 
 async def _remove_previous_item(mass: Any, queue_id: str, item_id: str) -> None:

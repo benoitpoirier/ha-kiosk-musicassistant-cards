@@ -125,6 +125,10 @@ play_now:
     username:
       selector:
         text:
+    autofill_similar:
+      default: false
+      selector:
+        boolean:
 
 remove_queue_item:
   fields:

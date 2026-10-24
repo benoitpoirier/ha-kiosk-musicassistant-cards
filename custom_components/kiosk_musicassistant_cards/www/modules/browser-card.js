@@ -1342,7 +1342,9 @@ export class MusicAssistantTouchCard extends HTMLElement {
           playbackStatus.sent = true;
           this._renderPlaybackProgress(playbackStatus);
         }
-        await this._call(DOMAIN, 'play_now', this._withUser({ entity_id: entity, uri }, username));
+        await this._call(DOMAIN, 'play_now', this._withUser({
+          entity_id: entity, uri, autofill_similar: this._cfg.autofill_similar !== false,
+        }, username));
         if (playbackStatus && this._playbackProgress === playbackStatus) {
           playbackStatus.accepted = true;
           playbackStatus.acceptedAt = Date.now();

@@ -213,6 +213,7 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         ] } } },
         { name: 'transfer_on_switch', selector: { boolean: {} } },
         { name: 'retry_next', selector: { boolean: {} } },
+        { name: 'autofill_similar', selector: { boolean: {} } },
         { name: 'full_modal', selector: { boolean: {} } },
       ],
       {
@@ -222,6 +223,7 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         tile_action: config.tile_action || 'open',
         transfer_on_switch: config.transfer_on_switch !== false,
         retry_next: config.retry_next !== false,
+        autofill_similar: config.autofill_similar !== false,
         full_modal: config.full_modal === true,
       },
       (v) => {
@@ -234,6 +236,7 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         this._cfg.tile_action = v.tile_action;
         this._cfg.transfer_on_switch = !!v.transfer_on_switch;
         this._cfg.retry_next = !!v.retry_next;
+        this._cfg.autofill_similar = !!v.autofill_similar;
         if (v.full_modal) this._cfg.full_modal = true;
         else delete this._cfg.full_modal;
         this._emitConfigChange();

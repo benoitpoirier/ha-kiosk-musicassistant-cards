@@ -137,6 +137,7 @@ links:
 | `tile_action` | `open` | `open` shows the tracks of a tile, `play` plays it straight away. |
 | `transfer_on_switch` | `true` | Move the queue to the new speaker when switching zones while playing. |
 | `retry_next` | `true` | Re-send *next/previous* once if nothing happened after 2.5 s (some Chromecast players). |
+| `autofill_similar` | `true` | When a single track is played and it is alone in the queue (or the queue was empty), queue up to 10 similar tracks from your music providers. Runs only after the track has started, so it never delays playback. |
 | `full_modal` | `false` | Show the detailed step-by-step modal while a track starts. By default a light pill with an animated icon and a short phrase is shown instead. |
 | `keyboard` | `true` | Built-in on-screen keyboard. `false` uses a regular text field and the device keyboard. |
 | `limit` | `24` | Search results per media type. |
@@ -305,9 +306,10 @@ data:
   entity_id: media_player.living_room
   uri: spotify://track/5XEHDW9XdDosfI5pltNDq1
   username: alice   # optional
+  autofill_similar: true   # optional, default false
 ```
 
-Plays a track at once in place of the track that is playing: the new track is inserted after the current one and started, then the previous one is removed from the queue; the rest of the queue is kept. The browser card uses it for every single track (search results, album or playlist tracks, Discover, track tiles). Albums, playlists, artists and radio stations replace the whole queue.
+Plays a track at once in place of the track that is playing: the new track is inserted after the current one and started, then the previous one is removed from the queue; the rest of the queue is kept. With `autofill_similar`, once the track plays and is alone in the queue, similar tracks are added in the background. The browser card uses it for every single track (search results, album or playlist tracks, Discover, track tiles). Albums, playlists, artists and radio stations replace the whole queue.
 ### `kiosk_musicassistant_cards.play_tracks`
 
 ```yaml
