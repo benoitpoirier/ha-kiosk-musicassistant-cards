@@ -78,7 +78,7 @@ export const KIOSK_CSS = `
 .now-playing .ctr button.primary{width:80px!important;height:80px!important;color:var(--on-acc)!important;background:var(--grad)!important;box-shadow:0 10px 26px var(--acc-glow)}
 .now-playing .ctr button.primary ha-icon{--mdc-icon-size:40px}
 .volume-row{gap:10px!important;margin-top:14px!important;padding:8px!important;border-radius:20px!important;background:var(--ov1)!important}
-.volume-row>button.vk{width:58px!important;height:58px!important;border-radius:16px!important;color:var(--txt)!important;background:var(--ov2)!important}
+.volume-row>button.vk{width:58px!important;height:58px!important;border-radius:50%!important;color:var(--on-acc)!important;background:var(--grad)!important;box-shadow:0 6px 18px var(--acc-glow)}
 .volume-row>button.vk ha-icon,.volume-row>button.vk svg{--mdc-icon-size:30px;width:30px;height:30px}
 .volume-row>button.slider{height:58px!important}
 .slider .baan,.slider .fill{height:10px!important}
