@@ -1,6 +1,6 @@
 // Entry point. Home Assistant loads this resource as a JavaScript module.
 // Sub-modules are imported with the same ?v= query so a new version never reuses cached files.
-const VERSION = '1.4.10';
+const VERSION = '1.4.11';
 const Q = `?v=${VERSION}`;
 const { MusicAssistantTouchCard } = await import(`./modules/browser-card.js${Q}`);
 const { MusicAssistantTouchCardEditor } = await import(`./modules/card-editor.js${Q}`);

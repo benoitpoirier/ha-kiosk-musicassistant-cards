@@ -430,7 +430,7 @@ export class KioskNowPlayingCard extends HTMLElement {
     const picture = safeImageUrl(attributes.entity_picture_local || attributes.entity_picture || '');
     const signature = [entity, state && state.state, attributes.media_title, attributes.media_artist,
       attributes.media_album_name, attributes.media_content_id,
-      picture.replace(/([?&])(token|cache)=[^&]*/g, '$1'), attributes.active_queue,
+      picture.replace(/([?&])token=[^&]*/g, '$1'), attributes.active_queue,
       attributes.shuffle, attributes.repeat, attributes.supported_features,
       Number.isFinite(Number(attributes.volume_level)), this._selected,
       this._queueContext && this._queueContext.provider,
@@ -704,7 +704,7 @@ export class KioskNowPlayingCard extends HTMLElement {
     // The cover, the lyrics and the queue are only rebuilt when what they show
     // changes. Home Assistant rotates the access token in the picture URL every
     // few minutes: that is the same picture and must not reload the image.
-    const pictureKey = picture.replace(/([?&])(token|cache)=[^&]*/g, '$1');
+    const pictureKey = picture.replace(/([?&])token=[^&]*/g, '$1');
     let coverKey;
     let coverHtml;
     if (this._queueOpen) {

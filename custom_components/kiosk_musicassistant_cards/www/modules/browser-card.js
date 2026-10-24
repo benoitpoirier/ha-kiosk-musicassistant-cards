@@ -2246,7 +2246,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
     // Redraw only when something changes; rebuilding the cover on every state
     // update from Home Assistant would make the card slow.
     const sig = [entityId, selectedPlayer, displayState, title, artist, mediaAttributes.media_content_id,
-      artworkUrl.replace(/([?&])(token|cache)=[^&]*/g, '$1'), mediaAttributes.shuffle, mediaAttributes.repeat, mediaAttributes.media_duration].join('|');
+      artworkUrl.replace(/([?&])token=[^&]*/g, '$1'), mediaAttributes.shuffle, mediaAttributes.repeat, mediaAttributes.media_duration].join('|');
     if (sig === this._nowPlayingSignature) { this._updateProgress(); return; }
     this._nowPlayingSignature = sig;
     // If another player in the selected zone is playing, show where.
