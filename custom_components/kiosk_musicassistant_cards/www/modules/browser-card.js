@@ -1,7 +1,7 @@
 const Q = new URL(import.meta.url).search;
 const {
   BIB_MAX, BIB_TTL, LARGE_IMAGE_URL, SMALL_IMAGE_URL, KEYBOARD_ROWS, MEDIA_TYPES, mediaTypeFromUri,
-  normalizeSpotifyUri, PLAYING_STATES, safeImageUrl, VOLUME_CSS, defaultCategories, esc, formatDuration, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay,
+  normalizeSpotifyUri, autofillSimilar, PLAYING_STATES, safeImageUrl, VOLUME_CSS, defaultCategories, esc, formatDuration, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay,
 } = await import(`./shared.js${Q}`);
 const { KIOSK_CSS, KIOSK_THEMES } = await import(`./kiosk-theme.js${Q}`);
 
@@ -893,6 +893,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
     if (this._watchedStatesChanged() || rebuilt || this._optimisticState) {
       this._syncPlayer();
       this._syncPlaybackStatus();
+      if (this._cfg.autofill_similar !== false) autofillSimilar(this, hass, this._getActivePlayer(), this._getCurrentUser());
     }
   }
 

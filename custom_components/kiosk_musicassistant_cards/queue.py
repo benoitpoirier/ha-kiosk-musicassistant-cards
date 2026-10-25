@@ -309,6 +309,84 @@ async def _autofill_similar(
             _LOGGER.debug("Could not queue similar tracks on %s: %s", entity_id, err)
 
 
+# ---------- keep the queue going ----------
+# When the track that plays is the last one of the queue, queue 10 tracks
+# similar to it. A card asks once per playing track; the checks are done here,
+# on the live queue, so a card that sends a stale request changes nothing.
+AUTOFILL_QUEUE_SCHEMA = vol.Schema(
+    {
+        vol.Required("entity_id"): cv.entity_id,
+        vol.Optional("username"): cv.string,
+    }
+)
+DATA_AUTOFILL = "kiosk_musicassistant_cards_autofill"
+
+
+async def async_autofill_queue(call: ServiceCall) -> None:
+    """Queue similar tracks when the current track is the last one of the queue."""
+    hass = call.hass
+    entity_id = call.data["entity_id"]
+    extra = {"username": call.data["username"]} if call.data.get("username") else {}
+    entry = er.async_get(hass).async_get(entity_id)
+    state = hass.states.get(entity_id)
+    if not entry or not entry.config_entry_id or state is None or state.state != "playing":
+        return
+    queue_id = state.attributes.get("active_queue")
+    mass = get_music_assistant_client(hass, entry.config_entry_id)
+    queue = mass.player_queues.get(queue_id) if queue_id else None
+    if queue is None or queue.current_item is None:
+        return
+    repeat = getattr(queue.repeat_mode, "value", queue.repeat_mode)
+    if repeat not in (None, "off"):
+        return  # a repeating queue never runs out
+    if (queue.items or 0) - (queue.current_index or 0) > 1:
+        return
+    media = queue.current_item.media_item
+    uri = getattr(media, "uri", None)
+    seed = _seed_from_uri(uri, "", None) if uri else None
+    if seed is None:
+        return  # radio stations and other non-track items have no similar tracks
+    done = hass.data.setdefault(DATA_AUTOFILL, {})
+    item_id = queue.current_item.queue_item_id
+    if done.get(entity_id) == item_id:
+        return  # already filled for this track
+    done[entity_id] = item_id
+    try:
+        raw_items = await _async_similar(mass, extra.get("username"), seed)
+        if not raw_items:
+            raw_items = await _async_similar(mass, extra.get("username"), seed)
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.debug("Similar tracks for %s failed: %s", uri, err)
+        return
+    uris: list[str] = []
+    for raw in raw_items:
+        similar = _portable_uri(raw.get("uri") or "") if isinstance(raw, dict) else ""
+        if similar and similar != _portable_uri(uri) and similar not in uris:
+            uris.append(similar)
+        if len(uris) == AUTOFILL_COUNT:
+            break
+    if not uris:
+        _LOGGER.debug("Autofill on %s: no similar tracks for %s", entity_id, uri)
+        return
+    players = hass.data.setdefault(DATA_PLAY, {})
+    player = players.setdefault(entity_id, {"lock": asyncio.Lock(), "generation": 0})
+    async with player["lock"]:
+        # The track may have changed or the queue grown while looking up.
+        current = queue.current_item
+        if current is None or current.queue_item_id != item_id:
+            return
+        if (queue.items or 0) - (queue.current_index or 0) > 1:
+            return
+        try:
+            await hass.services.async_call(
+                "music_assistant", "play_media",
+                {"media_id": uris, "enqueue": "add", **extra},
+                target={"entity_id": entity_id}, blocking=True,
+            )
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Could not queue similar tracks on %s: %s", entity_id, err)
+
+
 async def _remove_previous_item(mass: Any, queue_id: str, item_id: str) -> None:
     """Drop the track that was replaced; retry once while it is still the current item."""
     for attempt in range(2):

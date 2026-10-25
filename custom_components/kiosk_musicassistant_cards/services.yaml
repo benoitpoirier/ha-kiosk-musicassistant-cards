@@ -142,3 +142,15 @@ remove_queue_item:
       required: true
       selector:
         text:
+
+autofill_queue:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          integration: music_assistant
+          domain: media_player
+    username:
+      selector:
+        text:

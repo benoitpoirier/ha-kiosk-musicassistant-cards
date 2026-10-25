@@ -16,10 +16,12 @@ from music_assistant_models.media_items import Track
 
 from .const import CARD_URL, DOMAIN, STATIC_URL
 from .queue import (
+    AUTOFILL_QUEUE_SCHEMA,
     GET_QUEUE_ITEMS_SCHEMA,
     PLAY_NOW_SCHEMA,
     PLAY_TRACKS_SCHEMA,
     REMOVE_QUEUE_ITEM_SCHEMA,
+    async_autofill_queue,
     async_get_queue_items,
     async_play_now,
     async_play_tracks,
@@ -43,6 +45,7 @@ SERVICE_GET_QUEUE_ITEMS = "get_queue_items"
 SERVICE_PLAY_TRACKS = "play_tracks"
 SERVICE_PLAY_NOW = "play_now"
 SERVICE_REMOVE_QUEUE_ITEM = "remove_queue_item"
+SERVICE_AUTOFILL_QUEUE = "autofill_queue"
 
 
 async def _async_get_track_lyrics(call: ServiceCall) -> dict[str, str | None]:
@@ -95,6 +98,9 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         DOMAIN, SERVICE_PLAY_TRACKS, async_play_tracks, schema=PLAY_TRACKS_SCHEMA
     )
     hass.services.async_register(DOMAIN, SERVICE_PLAY_NOW, async_play_now, schema=PLAY_NOW_SCHEMA)
+    hass.services.async_register(
+        DOMAIN, SERVICE_AUTOFILL_QUEUE, async_autofill_queue, schema=AUTOFILL_QUEUE_SCHEMA
+    )
     hass.services.async_register(
         DOMAIN, SERVICE_REMOVE_QUEUE_ITEM, async_remove_queue_item, schema=REMOVE_QUEUE_ITEM_SCHEMA
     )

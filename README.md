@@ -50,7 +50,7 @@ Both cards are responsive and tuned for a 1280×800 kiosk (Echo Show 8 class): t
 
 - **Mobile portrait layout**: on a narrow screen (card width up to 480 px) the browser card stacks the player (artwork beside the title, full-width progress and controls) above the browser, and the now-playing card uses tighter sizes. The landscape layout is unchanged.
 - **Light playback modal**: while a track starts, a compact floating pill with an animated equalizer and a short sentence replaces the step-by-step dialog. It never blocks touch input. The detailed modal is still available with `full_modal: true`.
-- **Similar tracks after play** (`autofill_similar`, on by default): when a single track is played and is alone in the queue, similar tracks are queued in the background once it has started, so playback is never delayed.
+- **Similar tracks after play** (`autofill_similar`, on by default): when the track that plays is the last one of the queue, 10 similar tracks are queued in the background (browser and now-playing cards), so the music never stops. Repeating queues and radio stations are left alone.
 - **Faster, more reliable playback tracking**: the progress follows the real player state (watchdog, no dependency on clock skew) and avoids heavy work on every Home Assistant state update.
 - **Volume buttons** of the browser card now match the main play button (round, theme gradient and glow).
 - **Cache-safe updates**: every module is loaded with the version in its URL, so a new version is never mixed with cached files from an older one.
@@ -175,7 +175,7 @@ links:
 | `tile_action` | `open` | `open` shows the tracks of a tile, `play` plays it straight away. |
 | `transfer_on_switch` | `true` | Ask whether to move the queue to the new speaker (stopping the current one) when switching zones while playing. `false` never asks and never moves. |
 | `retry_next` | `true` | Re-send *next/previous* once if nothing happened after 2.5 s (some Chromecast players). |
-| `autofill_similar` | `true` | When a single track is played and it is alone in the queue (or the queue was empty), queue up to 10 similar tracks from your music providers. Runs only after the track has started, so it never delays playback. |
+| `autofill_similar` | `true` | When the track that plays is the last one of the queue, queue 10 similar tracks from your music providers. Runs in the background, so it never delays playback. |
 | `full_modal` | `false` | Show the detailed step-by-step modal while a track starts. By default a light pill with an animated icon and a short phrase is shown instead. |
 | `keyboard` | `false` | `false` uses a regular text field and the device keyboard. `true` uses the built-in on-screen keyboard. |
 | `limit` | `24` | Search results per media type. |
@@ -272,7 +272,8 @@ favorite_accounts:
 | `players` | all Music Assistant players | Players to follow. The card shows the one that is playing (or the most recently paused). When several play at once, buttons let you choose. |
 | `volume_step` | `1` | Volume button step (%). The -/+ buttons repeat while held. |
 | `theme` | `sunset` | Accent colours, same names as the browser card `theme`. |
-| `provider_names` | none | Display names for Music Assistant provider instance ids (`spotify--xxxx`). The instance id is shown in Music Assistant under *Settings > Music providers*. |
+| `autofill_similar` | `true` | When the track that plays is the last one of the queue, queue 10 similar tracks. |
+| `username` | none | Music Assistant user used to look up similar tracks. | | none | Display names for Music Assistant provider instance ids (`spotify--xxxx`). The instance id is shown in Music Assistant under *Settings > Music providers*. |
 | `favorite_accounts` | none | Maps a provider instance id to a SpotifyPlus `media_player` to show a favourite (heart) button for the current track. |
 
 Synchronised lyrics are shown only when Music Assistant provides time-stamped (LRC) lyrics for the current track.
@@ -371,6 +372,18 @@ data:
 ```
 
 Removes one track from the player's active queue. The now-playing queue panel shows a remove (×) button on every track except the one playing.
+
+### `kiosk_musicassistant_cards.autofill_queue`
+
+```yaml
+action: kiosk_musicassistant_cards.autofill_queue
+data:
+  entity_id: media_player.living_room
+  username: alice   # optional
+```
+
+When the playing track is the last one of the queue (and the queue does not repeat), queues 10 tracks similar to it, once per track. The cards call it automatically while `autofill_similar` is on.
+
 ## Finding the Music Assistant `config_entry_id`
 
 In the card editor, pick Music Assistant from the drop-down. In YAML, open **Settings > Devices & services > Music Assistant**; the id is the last part of the URL of the integration entry, or use the drop-down of the `config_entry_id` field in **Developer tools > Actions**.

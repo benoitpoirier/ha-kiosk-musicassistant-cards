@@ -149,6 +149,20 @@
           "description": "queue_item_id returned by get_queue_items."
         }
       }
+    },
+    "autofill_queue": {
+      "name": "Autofill queue",
+      "description": "Queue 10 tracks similar to the current one when it is the last track of the queue.",
+      "fields": {
+        "entity_id": {
+          "name": "Player",
+          "description": "Music Assistant player."
+        },
+        "username": {
+          "name": "Music Assistant user",
+          "description": "Optional Music Assistant user to act as."
+        }
+      }
     }
   }
 }

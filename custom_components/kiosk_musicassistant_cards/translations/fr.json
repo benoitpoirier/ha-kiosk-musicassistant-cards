@@ -149,6 +149,20 @@
           "description": "queue_item_id retourné par get_queue_items."
         }
       }
+    },
+    "autofill_queue": {
+      "name": "Compléter la file",
+      "description": "Ajoute 10 titres similaires au titre en cours lorsqu’il est le dernier de la file.",
+      "fields": {
+        "entity_id": {
+          "name": "Lecteur",
+          "description": "Lecteur Music Assistant."
+        },
+        "username": {
+          "name": "Utilisateur Music Assistant",
+          "description": "Utilisateur Music Assistant facultatif au nom duquel agir."
+        }
+      }
     }
   }
 }

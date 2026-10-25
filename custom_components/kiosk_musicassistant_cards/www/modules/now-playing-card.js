@@ -1,5 +1,5 @@
 const Q = new URL(import.meta.url).search;
-const { safeImageUrl, VOLUME_CSS, esc, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay } = await import(`./shared.js${Q}`);
+const { safeImageUrl, VOLUME_CSS, esc, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay, autofillSimilar } = await import(`./shared.js${Q}`);
 const { THEME_COLORS } = await import(`./kiosk-theme.js${Q}`);
 
 const DOMAIN = 'kiosk_musicassistant_cards';
@@ -412,6 +412,7 @@ export class KioskNowPlayingCard extends HTMLElement {
     if (!this.shadowRoot || !this.shadowRoot.getElementById('title')) return;
     const entity = this._activeEntity();
     this._entity = entity;
+    if (this._cfg.autofill_similar !== false) autofillSimilar(this, this._hass, entity, this._cfg.username);
     const state = this._state(entity);
     const attributes = (state && state.attributes) || {};
     const queueContextKey = attributes.active_queue

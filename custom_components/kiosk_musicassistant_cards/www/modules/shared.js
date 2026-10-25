@@ -15,6 +15,30 @@ export const esc = (s) => String(s == null ? '' : s)
 
 export const PLAYING_STATES = ['playing', 'paused', 'buffering'];
 
+// Ask the integration to queue similar tracks once per playing track; it checks the live queue.
+export const AUTOFILL_DELAY = 5000;
+
+export function autofillSimilar(owner, hass, entityId, username) {
+  const key = (h) => {
+    const state = h && h.states && h.states[entityId];
+    const attributes = (state && state.attributes) || {};
+    return state && state.state === 'playing' && attributes.active_queue
+      ? `${entityId}|${attributes.media_content_id || ''}` : '';
+  };
+  const wanted = key(hass);
+  if (!wanted || owner._autofillKey === wanted) return;
+  owner._autofillKey = wanted;
+  clearTimeout(owner._autofillTimer);
+  // Wait so the player finishes refreshing for the new track first; skip if it changed meanwhile.
+  owner._autofillTimer = setTimeout(() => {
+    const current = owner._hass;
+    if (key(current) !== wanted) return;
+    const data = { entity_id: entityId };
+    if (username) data.username = username;
+    Promise.resolve(current.callService('kiosk_musicassistant_cards', 'autofill_queue', data)).catch(() => {});
+  }, AUTOFILL_DELAY);
+}
+
 // Music Assistant serves the covers it proxies itself over plain http, on its
 // own address. On a dashboard opened over https - Nabu Casa, a reverse proxy -
 // the browser refuses to load those as mixed content and you get an empty
@@ -133,7 +157,7 @@ export const TAAL = {
       themas: { sunset: 'Sunset (peach & pink)', spotify: 'Spotify (green on black)', ocean: 'Ocean (cyan & indigo)', aurora: 'Aurora (mint & lavender)', neon: 'Neon (pink & violet)', ember: 'Ember (amber & red)', graphite: 'Graphite (monochrome)', daylight: 'Daylight (light)' },
       transfer_on_switch: 'Move the queue when switching speaker',
       retry_next: 'Re-send skip if nothing happens (Chromecast)',
-      autofill_similar: 'Queue similar tracks when a track plays alone (after it starts)',
+      autofill_similar: 'Queue 10 similar tracks when the last track of the queue plays',
       full_modal: 'Full modal on play (detailed progress steps)',
       automatisch: 'Follow Home Assistant', openen: 'Show its tracks', afspelen: 'Play it',
       naam: 'Name', entity: 'Player', volume: 'Volume goes to (optional)', icon: 'Icon',
@@ -234,7 +258,7 @@ export const TAAL = {
       themas: { sunset: 'Zonsondergang (perzik & roze)', spotify: 'Spotify (groen op zwart)', ocean: 'Oceaan (cyaan & indigo)', aurora: 'Aurora (mint & lavendel)', neon: 'Neon (roze & violet)', ember: 'Gloed (amber & rood)', graphite: 'Grafiet (monochroom)', daylight: 'Daglicht (licht)' },
       transfer_on_switch: 'Muziek meenemen bij wisselen van speaker',
       retry_next: 'Doorspoelen opnieuw sturen als er niets gebeurt (Chromecast)',
-      autofill_similar: 'Vergelijkbare nummers toevoegen als een nummer alleen speelt (na de start)',
+      autofill_similar: '10 vergelijkbare nummers toevoegen als het laatste nummer van de wachtrij speelt',
       full_modal: 'Volledige melding bij afspelen (gedetailleerde stappen)',
       automatisch: 'Die van Home Assistant', openen: 'Nummers tonen', afspelen: 'Meteen afspelen',
       naam: 'Naam', entity: 'Speler', volume: 'Volume gaat naar (optioneel)', icon: 'Icoon',
@@ -339,7 +363,7 @@ export const TAAL = {
       themas: { sunset: 'Coucher de soleil (pêche et rose)', spotify: 'Spotify (vert sur noir)', ocean: 'Océan (cyan et indigo)', aurora: 'Aurore (menthe et lavande)', neon: 'Néon (rose et violet)', ember: 'Braise (ambre et rouge)', graphite: 'Graphite (monochrome)', daylight: 'Jour (clair)' },
       transfer_on_switch: 'Transférer la file lors du changement de lecteur',
       retry_next: 'Renvoyer la commande Suivant si rien ne se passe (Chromecast)',
-      autofill_similar: 'Ajouter des titres similaires quand un titre joue seul (après son démarrage)',
+      autofill_similar: 'Ajouter 10 titres similaires quand le dernier titre de la file joue',
       full_modal: 'Modale complète à la lecture (étapes détaillées)',
       automatisch: 'Suivre Home Assistant', openen: 'Afficher ses titres', afspelen: 'Lire',
       naam: 'Nom', entity: 'Lecteur', volume: 'Lecteur de volume (facultatif)', icon: 'Icône',
