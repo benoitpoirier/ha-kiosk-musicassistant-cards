@@ -148,6 +148,7 @@ export const TAAL = {
       title_size: 'Title (px)', artist_size: 'Artist / band (px)', album_size: 'Album (px)',
       title_size_no_buttons: 'Title (px)', artist_size_no_buttons: 'Artist / band (px)', album_size_no_buttons: 'Album (px)',
       username: 'Music Assistant user',
+      username_help: 'Optional. Music Assistant user whose history and favourites seed the similar tracks.',
       autofill_similar: 'Queue 10 similar tracks when the last track plays', volume_step: 'Volume button step (%)',
     },
     ed: {
@@ -260,6 +261,7 @@ export const TAAL = {
       title_size: 'Titel (px)', artist_size: 'Artiest / groep (px)', album_size: 'Album (px)',
       title_size_no_buttons: 'Titel (px)', artist_size_no_buttons: 'Artiest / groep (px)', album_size_no_buttons: 'Album (px)',
       username: 'Music Assistant-gebruiker',
+      username_help: 'Optioneel. Music Assistant-gebruiker wiens geschiedenis en favorieten de vergelijkbare nummers bepalen.',
       autofill_similar: '10 vergelijkbare nummers toevoegen als het laatste speelt', volume_step: 'Stap volumeknoppen (%)',
     },
     ed: {
@@ -375,6 +377,7 @@ export const TAAL = {
       title_size: 'Titre (px)', artist_size: 'Groupe / artiste (px)', album_size: 'Album (px)',
       title_size_no_buttons: 'Titre (px)', artist_size_no_buttons: 'Groupe / artiste (px)', album_size_no_buttons: 'Album (px)',
       username: 'Utilisateur Music Assistant',
+      username_help: 'Facultatif. Utilisateur Music Assistant dont l’historique et les favoris servent de base aux titres similaires.',
       autofill_similar: 'Ajouter 10 titres similaires quand le dernier joue', volume_step: 'Pas des boutons de volume (%)',
     },
     ed: {
