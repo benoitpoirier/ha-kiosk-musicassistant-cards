@@ -378,7 +378,8 @@ export class KioskNowPlayingCard extends HTMLElement {
     const shell = this.shadowRoot && this.shadowRoot.querySelector('.shell');
     if (!shell) return;
     const margin = this._cfg.fill_margin == null ? 8 : Number(this._cfg.fill_margin) || 0;
-    const height = Math.max(420, Math.round(window.innerHeight - this.getBoundingClientRect().top - margin));
+    // The dashboard editor puts its Edit bar under the card: keep it reachable.
+    const height = Math.max(420, Math.round(window.innerHeight - this.getBoundingClientRect().top - margin - (this._inEditMode() ? 72 : 0)));
     if (height === this._filledHeight) return;
     this._filledHeight = height;
     shell.style.setProperty('--now-playing-height', `${height}px`);
@@ -386,6 +387,16 @@ export class KioskNowPlayingCard extends HTMLElement {
   }
 
   _state(entity) { return this._hass && this._hass.states ? this._hass.states[entity] : null; }
+
+  _inEditMode() {
+    let node = this;
+    while (node) {
+      if (node.tagName === 'HUI-CARD-OPTIONS') return true;
+      const root = node.getRootNode && node.getRootNode();
+      node = node.parentElement || (root && root.host);
+    }
+    return false;
+  }
 
   _activeEntity() {
     const playing = this._players.filter((player) => {
