@@ -307,7 +307,9 @@ async def _async_ma_history_seeds(hass: HomeAssistant, entry_id: str, user: str 
     return seeds
 
 
-async def _async_similar(mass: Any, user: str | None, seed: dict[str, Any]) -> list[Any]:
+async def _async_similar(
+    mass: Any, user: str | None, seed: dict[str, Any], timeout: float = SIMILAR_TIMEOUT
+) -> list[Any]:
     kwargs = {
         "item_id": seed["item_id"],
         "provider_instance_id_or_domain": seed["provider"],
@@ -316,7 +318,7 @@ async def _async_similar(mass: Any, user: str | None, seed: dict[str, Any]) -> l
     }
     try:
         result = await asyncio.wait_for(
-            _send(mass, "music/tracks/similar_tracks", user, **kwargs), SIMILAR_TIMEOUT
+            _send(mass, "music/tracks/similar_tracks", user, **kwargs), timeout
         )
     except TimeoutError:
         # A slow provider must not hold the whole feed back; its answer lands
@@ -329,7 +331,7 @@ async def _async_similar(mass: Any, user: str | None, seed: dict[str, Any]) -> l
             return []
         try:
             result = await asyncio.wait_for(
-                mass.send_command("music/tracks/similar_tracks", **kwargs), SIMILAR_TIMEOUT
+                mass.send_command("music/tracks/similar_tracks", **kwargs), timeout
             )
         except Exception as err2:  # noqa: BLE001
             _LOGGER.debug("Similar tracks for %s failed: %s", seed, err2)

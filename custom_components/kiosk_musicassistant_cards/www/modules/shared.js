@@ -35,7 +35,8 @@ export function autofillSimilar(owner, hass, entityId, username) {
     if (key(current) !== wanted) return;
     const data = { entity_id: entityId };
     if (username) data.username = username;
-    Promise.resolve(current.callService('kiosk_musicassistant_cards', 'autofill_queue', data)).catch(() => {});
+    Promise.resolve(current.callService('kiosk_musicassistant_cards', 'autofill_queue', data))
+      .catch((error) => console.warn('kiosk_musicassistant_cards.autofill_queue failed', error));
   }, AUTOFILL_DELAY);
 }
 

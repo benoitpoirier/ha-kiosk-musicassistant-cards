@@ -201,6 +201,8 @@ PLAY_NOW_SCHEMA = vol.Schema(
 AUTOFILL_COUNT = 10
 AUTOFILL_WAIT = 30
 AUTOFILL_SETTLE = 12
+# A cold similar-tracks lookup can take far longer than the discovery rows allow.
+AUTOFILL_LOOKUP_TIMEOUT = 45
 
 
 async def async_play_now(call: ServiceCall) -> None:
@@ -278,12 +280,12 @@ async def _autofill_similar(
         _LOGGER.debug("Autofill on %s: the queue holds other tracks", entity_id)
         return
     try:
-        raw_items = await _async_similar(mass, extra.get("username"), seed)
+        raw_items = await _async_similar(mass, extra.get("username"), seed, AUTOFILL_LOOKUP_TIMEOUT)
         if not raw_items:
             # A cold lookup can outlast the timeout; its answer is then cached.
-            raw_items = await _async_similar(mass, extra.get("username"), seed)
+            raw_items = await _async_similar(mass, extra.get("username"), seed, AUTOFILL_LOOKUP_TIMEOUT)
     except Exception as err:  # noqa: BLE001
-        _LOGGER.debug("Similar tracks for %s failed: %s", uri, err)
+        _LOGGER.warning("Similar tracks for %s failed: %s", uri, err)
         return
     uris: list[str] = []
     for raw in raw_items:
@@ -293,7 +295,7 @@ async def _autofill_similar(
         if len(uris) == AUTOFILL_COUNT:
             break
     if not uris:
-        _LOGGER.debug("Autofill on %s: no similar tracks for %s", entity_id, uri)
+        _LOGGER.warning("Autofill on %s: no similar tracks for %s", entity_id, uri)
         return
     async with player["lock"]:
         # A newer tap, or tracks added meanwhile, make the suggestion obsolete.
@@ -305,8 +307,9 @@ async def _autofill_similar(
                 {"media_id": uris, "enqueue": "add", **extra},
                 target={"entity_id": entity_id}, blocking=True,
             )
+            _LOGGER.info("Autofill on %s: queued %d similar tracks for %s", entity_id, len(uris), uri)
         except Exception as err:  # noqa: BLE001
-            _LOGGER.debug("Could not queue similar tracks on %s: %s", entity_id, err)
+            _LOGGER.warning("Could not queue similar tracks on %s: %s", entity_id, err)
 
 
 # ---------- keep the queue going ----------
@@ -352,11 +355,12 @@ async def async_autofill_queue(call: ServiceCall) -> None:
         return  # already filled for this track
     done[entity_id] = item_id
     try:
-        raw_items = await _async_similar(mass, extra.get("username"), seed)
+        raw_items = await _async_similar(mass, extra.get("username"), seed, AUTOFILL_LOOKUP_TIMEOUT)
         if not raw_items:
-            raw_items = await _async_similar(mass, extra.get("username"), seed)
+            raw_items = await _async_similar(mass, extra.get("username"), seed, AUTOFILL_LOOKUP_TIMEOUT)
     except Exception as err:  # noqa: BLE001
-        _LOGGER.debug("Similar tracks for %s failed: %s", uri, err)
+        done.pop(entity_id, None)
+        _LOGGER.warning("Similar tracks for %s failed: %s", uri, err)
         return
     uris: list[str] = []
     for raw in raw_items:
@@ -366,7 +370,8 @@ async def async_autofill_queue(call: ServiceCall) -> None:
         if len(uris) == AUTOFILL_COUNT:
             break
     if not uris:
-        _LOGGER.debug("Autofill on %s: no similar tracks for %s", entity_id, uri)
+        done.pop(entity_id, None)  # let a later request retry
+        _LOGGER.warning("Autofill on %s: no similar tracks for %s", entity_id, uri)
         return
     players = hass.data.setdefault(DATA_PLAY, {})
     player = players.setdefault(entity_id, {"lock": asyncio.Lock(), "generation": 0})
@@ -383,8 +388,10 @@ async def async_autofill_queue(call: ServiceCall) -> None:
                 {"media_id": uris, "enqueue": "add", **extra},
                 target={"entity_id": entity_id}, blocking=True,
             )
+            _LOGGER.info("Autofill on %s: queued %d similar tracks for %s", entity_id, len(uris), uri)
         except Exception as err:  # noqa: BLE001
-            _LOGGER.debug("Could not queue similar tracks on %s: %s", entity_id, err)
+            done.pop(entity_id, None)
+            _LOGGER.warning("Could not queue similar tracks on %s: %s", entity_id, err)
 
 
 async def _remove_previous_item(mass: Any, queue_id: str, item_id: str) -> None:
