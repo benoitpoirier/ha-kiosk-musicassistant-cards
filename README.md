@@ -177,7 +177,7 @@ links:
 | `retry_next` | `true` | Re-send *next/previous* once if nothing happened after 2.5 s (some Chromecast players). |
 | `autofill_similar` | `true` | When a single track is played and it is alone in the queue (or the queue was empty), queue up to 10 similar tracks from your music providers. Runs only after the track has started, so it never delays playback. |
 | `full_modal` | `false` | Show the detailed step-by-step modal while a track starts. By default a light pill with an animated icon and a short phrase is shown instead. |
-| `keyboard` | `true` | Built-in on-screen keyboard. `false` uses a regular text field and the device keyboard. |
+| `keyboard` | `false` | `false` uses a regular text field and the device keyboard. `true` uses the built-in on-screen keyboard. |
 | `limit` | `24` | Search results per media type. |
 | `search_types` | all | Subset of `track`, `album`, `artist`, `playlist`. |
 | `radio_delay` | `0` | Delay (s) applied to radio title/artwork changes so they match the audio buffer. |

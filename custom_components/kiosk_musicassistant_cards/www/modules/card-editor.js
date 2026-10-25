@@ -254,7 +254,7 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         ] } } },
       ],
       {
-        keyboard: config.keyboard !== false,
+        keyboard: config.keyboard === true,
         limit: config.limit == null ? 24 : config.limit,
         search_types: config.search_types || ['track', 'album', 'artist', 'playlist'],
       },

@@ -555,7 +555,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
     const stub = {
       config_entry_id: '',
       height: 556,
-      keyboard: true,
+      keyboard: false,
       limit: 24,
       categories: defaultCategories(hass && hass.language),
     };
@@ -587,7 +587,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
     // keyboard: false uses the device's regular text input.
     const thema = KIOSK_THEMES.includes(config.theme) ? config.theme : 'sunset';
     if (this.dataset.kt !== thema) this.dataset.kt = thema;
-    this._onScreenKeyboard = config.keyboard !== false;
+    this._onScreenKeyboard = config.keyboard === true;
     this._keyboardVisible = this._onScreenKeyboard;
     this._zones = null;
     this._watchedStateRefs = null;
