@@ -1407,7 +1407,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
     this._renderRight();
     const mediaType = MEDIA_TYPES[this._mediaTypeIndex];
     try {
-      const r = await this._ws({
+      const run = (user) => this._ws({
         type: 'call_service',
         domain: 'music_assistant',
         service: 'search',
@@ -1416,11 +1416,19 @@ export class MusicAssistantTouchCard extends HTMLElement {
           name: q,
           media_type: [mediaType.key],
           limit: this._cfg.limit || 24,
-        }, username),
+          library_only: false,
+        }, user),
         return_response: true,
       });
+      let r = await run(username);
+      let items = ((r && r.response) || {})[mediaType.responseKey] || [];
+      // The user's providers may return nothing for a catalog search: retry with the global session.
+      if (!items.length && username) {
+        if (generation !== this._sourceGeneration || sequence !== this._searchSeq) return;
+        r = await run(undefined);
+        items = ((r && r.response) || {})[mediaType.responseKey] || [];
+      }
       if (generation !== this._sourceGeneration || sequence !== this._searchSeq) return;
-      const items = ((r && r.response) || {})[mediaType.responseKey] || [];
       this._rememberImages(items);
       const ql = q.toLowerCase();
       const a = [], b = [];
