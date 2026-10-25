@@ -239,8 +239,6 @@ export class KioskNowPlayingCard extends HTMLElement {
           scale('font_scale', 1.15), scale('font_scale_no_buttons', 2),
         ] },
         { type: 'expandable', name: '', title: labels.advanced, schema: [
-          { name: 'hide_controls_entity', selector: { entity: {} } },
-          { name: 'hide_controls_state', selector: { text: {} } },
           { name: 'username', selector: { text: {} } },
           { name: 'autofill_similar', selector: { boolean: {} }, default: true },
           { name: 'volume_step', selector: { number: { min: 1, max: 20, step: 1, mode: 'box' } } },
@@ -388,6 +386,19 @@ export class KioskNowPlayingCard extends HTMLElement {
 
   _state(entity) { return this._hass && this._hass.states ? this._hass.states[entity] : null; }
 
+  // Looked up by attribute and cached; states are only rescanned every 30 s while it is missing.
+  _hideSwitchState() {
+    const states = this._hass && this._hass.states;
+    if (!states) return null;
+    if (this._hideSwitchId && states[this._hideSwitchId]) return states[this._hideSwitchId];
+    const now = Date.now();
+    if (this._hideSwitchScan && now - this._hideSwitchScan < 30000) return null;
+    this._hideSwitchScan = now;
+    this._hideSwitchId = Object.keys(states).find((id) => id.startsWith('switch.')
+      && (states[id].attributes || {}).kiosk_card_role === 'hide_controls') || null;
+    return this._hideSwitchId ? states[this._hideSwitchId] : null;
+  }
+
   _inEditMode() {
     let node = this;
     while (node) {
@@ -461,11 +472,9 @@ export class KioskNowPlayingCard extends HTMLElement {
     if (!this.shadowRoot || !this.shadowRoot.getElementById('title')) return;
     const entity = this._activeEntity();
     this._entity = entity;
-    // An entity driven by an HA automation (e.g. an input_boolean) hides every control.
-    const hideEntity = this._cfg.hide_controls_entity;
-    const hideState = this._state(hideEntity);
-    const bare = this._cfg.show_buttons === false
-      || (!!hideEntity && !!hideState && hideState.state === String(this._cfg.hide_controls_state || 'on'));
+    // The integration's switch (driven by an HA automation) hides every button.
+    const hideState = this._hideSwitchState();
+    const bare = this._cfg.show_buttons === false || (!!hideState && hideState.state === 'on');
     this.toggleAttribute('data-bare', bare);
     this.toggleAttribute('data-no-player', this._cfg.show_player === false);
     const scale = Number(bare ? this._cfg.font_scale_no_buttons : this._cfg.font_scale);

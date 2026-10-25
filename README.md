@@ -277,13 +277,25 @@ favorite_accounts:
 | `show_player` | `true` | Show the current player pill. |
 | `show_favorite` / `show_queue` / `show_lyrics` | `true` | Show the favourite, queue and lyrics buttons. |
 | `font_scale` | `1.15` | Text size multiplier while the buttons are shown (1 = original size). |
-| `font_scale_no_buttons` | `2` | Text size multiplier while the buttons are hidden (`show_buttons: false` or `hide_controls_entity`). |
-| `hide_controls_entity` | none | Entity (e.g. an `input_boolean`) that hides every control (transport, progress, volume, actions) while its state equals `hide_controls_state`. Drive it from a Home Assistant automation, for example while a screensaver is active. |
-| `hide_controls_state` | `on` | State of `hide_controls_entity` that hides the controls. |
+| `font_scale_no_buttons` | `2` | Text size multiplier while the buttons are hidden (`show_buttons: false` or the *Hide player buttons* switch is on). |
 | `username` | none | Music Assistant user used to look up similar tracks. | | none | Display names for Music Assistant provider instance ids (`spotify--xxxx`). The instance id is shown in Music Assistant under *Settings > Music providers*. |
 | `favorite_accounts` | none | Maps a provider instance id to a SpotifyPlus `media_player` to show a favourite (heart) button for the current track. |
 
 Synchronised lyrics are shown only when Music Assistant provides time-stamped (LRC) lyrics for the current track.
+
+### Hide player buttons switch
+
+The integration creates a switch, *Hide player buttons* (device *Kiosk Music Assistant Cards*). While it is on, every now-playing card hides all its buttons and uses `font_scale_no_buttons`; while it is off (the default) the buttons are shown. The state survives restarts. Turn it on and off from an automation, for example while a screensaver is active:
+
+```yaml
+triggers:
+  - trigger: state
+    entity_id: switch.my_screensaver_active
+actions:
+  - action: "switch.turn_{{ trigger.to_state.state }}"
+    target:
+      entity_id: switch.kiosk_music_assistant_cards_hide_player_buttons
+```
 
 ## Actions
 

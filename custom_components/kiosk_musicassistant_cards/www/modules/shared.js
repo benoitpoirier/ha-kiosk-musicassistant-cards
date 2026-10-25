@@ -146,8 +146,7 @@ export const TAAL = {
       show_favorite: 'Show the favourite button', show_queue: 'Show the queue button', show_lyrics: 'Show the lyrics button',
       font_scale: 'Text size with buttons', font_scale_no_buttons: 'Text size without buttons',
       font_scale_help: '1 = original size. Default 1.15.', font_scale_no_buttons_help: 'Used when the buttons are hidden. Default 2.',
-      hide_controls_entity: 'Hide buttons while this entity matches', hide_controls_entity_help: 'For example an input_boolean driven by an automation (screensaver).',
-      hide_controls_state: 'State that hides the buttons (default on)', username: 'Music Assistant user',
+      username: 'Music Assistant user',
       autofill_similar: 'Queue 10 similar tracks when the last track plays', volume_step: 'Volume button step (%)',
     },
     ed: {
@@ -258,8 +257,7 @@ export const TAAL = {
       show_favorite: 'Favorietenknop tonen', show_queue: 'Wachtrijknop tonen', show_lyrics: 'Songtekstknop tonen',
       font_scale: 'Tekstgrootte met knoppen', font_scale_no_buttons: 'Tekstgrootte zonder knoppen',
       font_scale_help: '1 = oorspronkelijke grootte. Standaard 1,15.', font_scale_no_buttons_help: 'Gebruikt als de knoppen verborgen zijn. Standaard 2.',
-      hide_controls_entity: 'Knoppen verbergen zolang deze entiteit overeenkomt', hide_controls_entity_help: 'Bijvoorbeeld een input_boolean die door een automatisering wordt gestuurd (screensaver).',
-      hide_controls_state: 'Status die de knoppen verbergt (standaard on)', username: 'Music Assistant-gebruiker',
+      username: 'Music Assistant-gebruiker',
       autofill_similar: '10 vergelijkbare nummers toevoegen als het laatste speelt', volume_step: 'Stap volumeknoppen (%)',
     },
     ed: {
@@ -373,8 +371,7 @@ export const TAAL = {
       show_favorite: 'Afficher le bouton J’aime', show_queue: 'Afficher le bouton de la file', show_lyrics: 'Afficher le bouton des paroles',
       font_scale: 'Taille du texte avec boutons', font_scale_no_buttons: 'Taille du texte sans boutons',
       font_scale_help: '1 = taille d’origine. Par défaut 1,15.', font_scale_no_buttons_help: 'Utilisée quand les boutons sont masqués. Par défaut 2.',
-      hide_controls_entity: 'Masquer les boutons tant que cette entité correspond', hide_controls_entity_help: 'Par exemple un input_boolean piloté par une automatisation (économiseur d’écran).',
-      hide_controls_state: 'État qui masque les boutons (par défaut on)', username: 'Utilisateur Music Assistant',
+      username: 'Utilisateur Music Assistant',
       autofill_similar: 'Ajouter 10 titres similaires quand le dernier joue', volume_step: 'Pas des boutons de volume (%)',
     },
     ed: {

@@ -11,6 +11,13 @@
       "already_configured": "Kiosk Music Assistant Cards is already configured."
     }
   },
+  "entity": {
+    "switch": {
+      "hide_controls": {
+        "name": "Hide player buttons"
+      }
+    }
+  },
   "services": {
     "get_track_lyrics": {
       "name": "Get track lyrics",
