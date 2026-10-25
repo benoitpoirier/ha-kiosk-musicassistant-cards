@@ -310,6 +310,12 @@ ha-icon { pointer-events:none; }
   padding:16px; background:rgba(0,0,0,.64); -webkit-backdrop-filter:blur(8px);
   backdrop-filter:blur(8px); animation:launch-fade .18s ease-out; }
 .launch-overlay[hidden] { display:none; }
+.move-actions { display:flex; flex-direction:column; gap:10px; margin-top:20px; }
+.move-actions button { min-height:48px; border-radius:14px; font-size:15px; font-weight:700;
+  background:var(--ov2); color:var(--primary-text-color,#e9e9ea); }
+.move-actions button.primary { background:var(--grad,var(--acc)); color:var(--on-acc,#fff);
+  box-shadow:0 7px 20px var(--acc-glow,rgba(29,185,84,.3)); }
+.move-text { margin:16px 0 0; color:var(--muted); font-size:14px; line-height:1.4; overflow-wrap:anywhere; }
 .launch-dialog { width:min(100%,440px); max-height:calc(100% - 8px); overflow:auto;
   padding:22px; border:1px solid var(--line); border-radius:18px;
   background:var(--ha-card-background,var(--card-background-color,#1c1c1e));
@@ -1093,7 +1099,61 @@ export class MusicAssistantTouchCard extends HTMLElement {
 
   // Switch players and move the queue when something is playing. Set
   // transfer_on_switch: false to change the selected player without moving it.
-  async _switchZone(i, el) {
+  _zoneLabel(zone) {
+    const state = this._getState(zone.entity);
+    return (state && state.attributes && state.attributes.friendly_name) || zone.name || zone.entity;
+  }
+
+  // Ask before moving a running track to another speaker.
+  _requestZone(i, el) {
+    const zones = this._getZones();
+    const target = zones[i];
+    const oldEntity = this._getActivePlayer();
+    const oldState = this._getState(oldEntity);
+    const playing = oldState && PLAYING_STATES.includes(oldState.state);
+    if (!target || !playing || target.entity === oldEntity || this._cfg.transfer_on_switch === false) {
+      this._switchZone(i, el);
+      return;
+    }
+    const t = this._getLanguage().verplaats;
+    const from = (oldState.attributes && oldState.attributes.friendly_name) || oldEntity;
+    const overlay = this.shadowRoot.getElementById('move-overlay');
+    if (!overlay) { this._switchZone(i, el); return; }
+    overlay.querySelector('.move-text').textContent = t.text.replace('{from}', from).replace('{to}', this._zoneLabel(target));
+    overlay.hidden = false;
+    this._pendingZone = { i, el };
+    const yes = overlay.querySelector('[data-act="move-yes"]');
+    if (yes) yes.focus();
+  }
+
+  _answerZone(move) {
+    const overlay = this.shadowRoot.getElementById('move-overlay');
+    if (overlay) overlay.hidden = true;
+    const pending = this._pendingZone;
+    this._pendingZone = null;
+    if (pending && move !== null) this._switchZone(pending.i, pending.el, move);
+  }
+
+  _moveDialogHtml() {
+    const t = this._getLanguage().verplaats;
+    return `<div class="launch-overlay" id="move-overlay" hidden>
+      <section class="launch-dialog" role="dialog" aria-modal="true" aria-labelledby="move-title">
+        <div class="launch-head">
+          <span class="launch-badge">${svg('speaker')}</span>
+          <div><p class="launch-eyebrow">${esc(t.eyebrow)}</p>
+            <h2 class="launch-title" id="move-title">${esc(t.title)}</h2></div>
+          <button class="launch-close" data-act="move-cancel" aria-label="${esc(this._getLanguage().launch.hide)}">${svg('mdi:close')}</button>
+        </div>
+        <p class="move-text"></p>
+        <div class="move-actions">
+          <button class="primary" data-act="move-yes">${esc(t.yes)}</button>
+          <button data-act="move-no">${esc(t.no)}</button>
+        </div>
+      </section>
+    </div>`;
+  }
+
+  async _switchZone(i, el, transfer = true) {
     const username = this._getCurrentUser();
     const oldEntity = this._getActivePlayer();
     const oldState = this._getState(oldEntity);
@@ -1115,7 +1175,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
 
       // Prepare the group for this zone, but never turn off the source player or
       // a group sharing its queue; defer that shutdown until after the transfer.
-      const shouldTransferQueue = wasPlaying && this._cfg.transfer_on_switch !== false;
+      const shouldTransferQueue = wasPlaying && transfer && this._cfg.transfer_on_switch !== false;
       const deferredShutdowns = [];
       await this._preparePlayer(oldEntity, shouldTransferQueue ? deferredShutdowns : null);
 
@@ -1511,6 +1571,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
         <div class="col right" id="right"></div>
         <div id="error-message" role="alert"></div>
         ${this._playbackDialogHtml()}
+        ${this._moveDialogHtml()}
       </div>`;
     this._observeKioskEditMode();
     this._renderZones();
@@ -1560,6 +1621,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
       if (ev.target && ev.target.id === 'search-input') this._searchQuery = ev.target.value;
     });
     this.shadowRoot.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && this._pendingZone) this._answerZone(null);
       if (ev.key === 'Escape' && this._playbackProgress) this._hidePlaybackDialog();
       if (ev.target && ev.target.id === 'search-input' && ev.key === 'Enter') {
         this._searchQuery = ev.target.value;
@@ -1691,7 +1753,10 @@ export class MusicAssistantTouchCard extends HTMLElement {
     const a = t.dataset.act;
     const i = t.dataset.i !== undefined ? parseInt(t.dataset.i, 10) : null;
     if (a === 'launch-hide') this._hidePlaybackDialog();
-    else if (a === 'zone') this._switchZone(i, t);
+    else if (a === 'zone') this._requestZone(i, t);
+    else if (a === 'move-yes') this._answerZone(true);
+    else if (a === 'move-no') this._answerZone(false);
+    else if (a === 'move-cancel') this._answerZone(null);
     else if (a === 'source') this._switchSource(i);
     else if (a === 'player') {
       this._playerVisible = !this._playerVisible;

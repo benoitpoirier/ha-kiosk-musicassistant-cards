@@ -173,7 +173,7 @@ links:
 | `volume_start` | none | When playback starts while the volume is above `volume_max`, drop back to this value (%). |
 | `volume_step` | `1` | Volume button step (%). |
 | `tile_action` | `open` | `open` shows the tracks of a tile, `play` plays it straight away. |
-| `transfer_on_switch` | `true` | Move the queue to the new speaker when switching zones while playing. |
+| `transfer_on_switch` | `true` | Ask whether to move the queue to the new speaker (stopping the current one) when switching zones while playing. `false` never asks and never moves. |
 | `retry_next` | `true` | Re-send *next/previous* once if nothing happened after 2.5 s (some Chromecast players). |
 | `autofill_similar` | `true` | When a single track is played and it is alone in the queue (or the queue was empty), queue up to 10 similar tracks from your music providers. Runs only after the track has started, so it never delays playback. |
 | `full_modal` | `false` | Show the detailed step-by-step modal while a track starts. By default a light pill with an animated icon and a short phrase is shown instead. |
