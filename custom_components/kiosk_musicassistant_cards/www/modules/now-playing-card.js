@@ -232,6 +232,11 @@ export class KioskNowPlayingCard extends HTMLElement {
 
   static getConfigForm() {
     const labels = getLanguage(document.querySelector('home-assistant')?.hass?.language).npEd;
+    const hass = document.querySelector('home-assistant')?.hass;
+    const hideSwitch = Object.values((hass && hass.states) || {})
+      .find((s) => s.entity_id.startsWith('switch.') && (s.attributes || {}).kiosk_card_role === 'hide_controls');
+    // Show the real display state when the stored value is unset.
+    const buttons = { name: 'show_buttons', selector: { boolean: {} }, default: hideSwitch ? hideSwitch.state !== 'on' : true };
     const bool = (name) => ({ name, selector: { boolean: {} }, default: true });
     const scale = (name, def) => ({ name, default: def, selector: { number: { min: 10, max: 200, step: 1, mode: 'box', unit_of_measurement: 'px' } } });
     return {
@@ -239,7 +244,7 @@ export class KioskNowPlayingCard extends HTMLElement {
         { name: 'config_entry_id', selector: { config_entry: { integration: 'music_assistant' } } },
         { name: 'height', selector: { number: { min: 0, max: 780, step: 10, mode: 'box', unit_of_measurement: 'px' } } },
         { type: 'expandable', name: '', title: labels.display, expanded: true, schema: [
-          bool('show_buttons'), bool('show_progress'), bool('show_player'), bool('show_favorite'), bool('show_queue'), bool('show_lyrics'),
+          buttons, bool('show_progress'), bool('show_player'), bool('show_favorite'), bool('show_queue'), bool('show_lyrics'),
         ] },
         { type: 'expandable', name: '', title: labels.textWith, expanded: true, schema: [
           scale('title_size', TEXT_SIZES.title[0]), scale('artist_size', TEXT_SIZES.artist[0]), scale('album_size', TEXT_SIZES.album[0]),
@@ -260,7 +265,16 @@ export class KioskNowPlayingCard extends HTMLElement {
   }
 
   setConfig(config) {
+    const previous = this._cfg;
     this._cfg = Object.assign({ height: 560 }, config || {});
+    // Toggling show_buttons in the editor drives the hide switch, which is the real display state.
+    if (previous && this._cfg.show_buttons !== previous.show_buttons) {
+      const hide = this._hideSwitchState();
+      const wantHidden = this._cfg.show_buttons === false;
+      if (hide && (hide.state === 'on') !== wantHidden) {
+        this._hass.callService('switch', wantHidden ? 'turn_on' : 'turn_off', { entity_id: hide.entity_id });
+      }
+    }
     this._signature = '';
     const shell = this.shadowRoot && this.shadowRoot.querySelector('.shell');
     if (shell) shell._sizes = {};
@@ -489,7 +503,7 @@ export class KioskNowPlayingCard extends HTMLElement {
     this._entity = entity;
     // The integration's switch (driven by an HA automation) hides every button.
     const hideState = this._hideSwitchState();
-    const bare = this._cfg.show_buttons === false || (!!hideState && hideState.state === 'on');
+    const bare = hideState ? hideState.state === 'on' : this._cfg.show_buttons === false;
     this.toggleAttribute('data-bare', bare);
     this.toggleAttribute('data-no-player', this._cfg.show_player === false);
     this.toggleAttribute('data-no-progress', this._cfg.show_progress === false);
