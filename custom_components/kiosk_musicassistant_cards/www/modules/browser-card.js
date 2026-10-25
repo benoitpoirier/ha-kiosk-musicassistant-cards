@@ -696,10 +696,6 @@ export class MusicAssistantTouchCard extends HTMLElement {
     return `${DOMAIN}:source:${this._cfg.config_entry_id}:${path}`;
   }
 
-  _trackStorageKey(username) {
-    return `${this._sourceStorageKey()}:track:${username}`;
-  }
-
   _restoreSource() {
     this._sourceIndex = 0;
     if (!this._sources.length) return;
@@ -1648,64 +1644,10 @@ export class MusicAssistantTouchCard extends HTMLElement {
     }).join('');
   }
 
-  _connectLiveTrack(source) {
-    const state = source && source.connect_entity ? this._getState(source.connect_entity) : null;
-    if (!state || !PLAYING_STATES.includes(state.state)) return '';
-    return normalizeSpotifyUri((state.attributes || {}).media_content_id || '');
-  }
-
-  _rememberConnectTrack(source, track) {
-    if (!source || !source.username || !track) return;
-    try {
-      window.localStorage.setItem(this._trackStorageKey(source.username), track);
-    } catch (error) { /* Kiosk browsers can disable local storage. */ }
-  }
-
-  _connectTrack(source) {
-    const liveTrack = this._connectLiveTrack(source);
-    if (liveTrack) {
-      this._rememberConnectTrack(source, liveTrack);
-      return liveTrack;
-    }
-    if (!source || !source.username) return '';
-    try {
-      return window.localStorage.getItem(this._trackStorageKey(source.username)) || '';
-    } catch (error) { return ''; }
-  }
-
-  _connectStopEntity(source) {
-    const spotify = source && source.connect_entity ? this._getState(source.connect_entity) : null;
-    const sourceName = String((spotify && spotify.attributes && spotify.attributes.source) || '')
-      .trim().toLowerCase();
-    if (sourceName) {
-      const linked = this._getZones().find((zone) => {
-        const state = this._getState(zone.entity);
-        const name = String((state && state.attributes && state.attributes.friendly_name)
-          || zone.name || zone.entity).trim().toLowerCase();
-        return name === sourceName && state && PLAYING_STATES.includes(state.state);
-      });
-      if (linked) return linked.entity;
-    }
-    const active = this._getActivePlayer();
-    const activeState = this._getState(active);
-    if (activeState && PLAYING_STATES.includes(activeState.state)) return active;
-    const connectPlayer = this._getZones().find((zone) => {
-      const state = this._getState(zone.entity);
-      const mediaId = state && state.attributes ? state.attributes.media_content_id || '' : '';
-      return state && PLAYING_STATES.includes(state.state) && mediaId.startsWith('spotify_connect://');
-    });
-    return connectPlayer ? connectPlayer.entity : '';
-  }
-
   async _switchSource(index) {
     if (!this._sources[index] || index === this._sourceIndex) return;
-    const previous = this._getSourceConfig();
-    this._rememberConnectTrack(previous, this._connectLiveTrack(previous));
-    const target = this._sources[index];
-    const stopEntity = this._connectStopEntity(previous);
-    const track = this._connectTrack(target);
     this._sourceIndex = index;
-    const generation = ++this._sourceGeneration;
+    ++this._sourceGeneration;
     this._searchSeq++;
     this._isSearching = false;
     this._optimisticState = null;
@@ -1724,12 +1666,6 @@ export class MusicAssistantTouchCard extends HTMLElement {
     this._renderSources();
     this._renderRight();
     this._loadMissingData();
-    if (stopEntity) {
-      await this._call('media_player', 'media_stop', {}, { entity_id: stopEntity })
-        .catch((error) => this._showError(error));
-    }
-    if (generation !== this._sourceGeneration) return;
-    if (track) await this._play(track, false, null, target.username, generation);
   }
 
   // Navigation buttons for other dashboard views, allowing the view to contain

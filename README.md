@@ -203,7 +203,7 @@ Lets several people switch between their own accounts (for example one Spotify a
 | --- | --- |
 | `name`, `icon` | Label and icon of the button. |
 | `username` | **Required.** Music Assistant username. |
-| `connect_entity` | Optional Spotify `media_player` of this account; the current Spotify Connect track is resumed when switching source. |
+| `connect_entity` | Optional Spotify `media_player` of this account. No longer used: switching source keeps the current playback running. |
 | `spotify_entity` | Optional [SpotifyPlus](https://github.com/thlucas1/homeassistantcomponent_spotifyplus) `media_player` of this account. Its Spotify listening history (top tracks of the last weeks, recently played) seeds the *Discover* recommendations. |
 
 The selected source is remembered per dashboard in the browser local storage.
