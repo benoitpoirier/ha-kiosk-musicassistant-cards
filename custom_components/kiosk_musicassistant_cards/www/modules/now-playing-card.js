@@ -14,7 +14,7 @@ const NOW_PLAYING_STYLE = `
 :host([data-bare]) .side { justify-content:flex-start; }
 :host([data-bare]) .mid { flex:1; min-height:0; display:grid; grid-template-rows:minmax(0,1fr) auto; gap:0; }
 :host([data-bare]) .meta { align-self:center; }
-:host([data-bare]) .title { -webkit-line-clamp:3; }
+:host([data-bare]) .title { -webkit-line-clamp:2; }
 :host([data-bare]) .progress { height:72px; }
 :host([data-bare]) .track { top:16px; height:10px; }
 :host([data-bare]) .thumb { top:21px; width:24px; height:24px; }
