@@ -4,13 +4,22 @@ const { THEME_COLORS } = await import(`./kiosk-theme.js${Q}`);
 
 const DOMAIN = 'kiosk_musicassistant_cards';
 const QUEUE_PAGE = 25;
+// Default text sizes in px: [buttons shown, buttons hidden].
+const TEXT_SIZES = { title: [54, 100], artist: [29, 50], album: [21, 36] };
 
 const NOW_PLAYING_STYLE = `
 :host { display:block; width:100%; color:#fff; container-type:inline-size; container-name:np;
   --np-acc:#f6b26b; --np-acc2:#e5739b; }
-:host([data-bare]) :is(.players, .actions, .transport, .bottom, .progress) { display:none !important; }
-:host([data-bare]) .side { justify-content:center; }
+:host([data-bare]) :is(.players, .actions, .transport, .bottom) { display:none !important; }
+:host([data-bare]) .side { justify-content:flex-start; }
+:host([data-bare]) .mid { flex:1; min-height:0; display:grid; grid-template-rows:minmax(0,1fr) auto; gap:0; }
+:host([data-bare]) .meta { align-self:center; }
 :host([data-bare]) .title { -webkit-line-clamp:3; }
+:host([data-bare]) .progress { height:72px; }
+:host([data-bare]) .track { top:16px; height:10px; }
+:host([data-bare]) .thumb { top:21px; width:24px; height:24px; }
+:host([data-bare]) .times { top:38px; font-size:20px; }
+:host([data-no-progress]) .progress { display:none !important; }
 :host([data-no-player]) .status { display:none; }
 :host([data-no-player]) .top:not(:has(.players:not(:empty), .actions:not(:empty))) { display:none; }
 * { box-sizing:border-box; }
@@ -88,13 +97,13 @@ ha-icon { pointer-events:none; }
 .side { display:flex; flex-direction:column; justify-content:space-between; gap:16px; min-width:0;
   height:var(--cov); max-height:100%; }
 .top { display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0; min-height:44px; }
-.status { display:inline-flex; align-items:center; gap:9px; height:calc(36px * var(--np-fs,1)); max-width:100%; padding:0 14px 0 12px;
+.status { display:inline-flex; align-items:center; gap:9px; height:36px; max-width:100%; padding:0 14px 0 12px;
   border-radius:999px; background:rgba(255,255,255,.1); box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);
-  font-size:calc(13px * var(--np-fs,1)); font-weight:700; white-space:nowrap; overflow:hidden; }
+  font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; }
 .st-label { font-size:11.5px; font-weight:800; letter-spacing:.9px; text-transform:uppercase; color:var(--np-acc); }
 .st-player { display:inline-flex; align-items:center; gap:5px; min-width:0; overflow:hidden; text-overflow:ellipsis;
   color:rgba(255,255,255,.85); }
-.st-player ha-icon { --mdc-icon-size:calc(16px * var(--np-fs,1)); flex:none; }
+.st-player ha-icon { --mdc-icon-size:16px; flex:none; }
 .eq { display:inline-flex; align-items:flex-end; gap:2px; height:14px; flex:none; }
 .eq i { width:3px; height:4px; border-radius:2px; background:var(--np-acc); opacity:.6; }
 .status.playing .eq i { opacity:1; animation:eq 1s ease-in-out infinite; }
@@ -109,17 +118,17 @@ ha-icon { pointer-events:none; }
 .players ha-icon { --mdc-icon-size:16px; }
 .mid { display:flex; flex-direction:column; gap:clamp(10px,1.6cqw,20px); min-width:0; }
 .meta { display:flex; flex-direction:column; min-width:0; }
-.title { font-size:calc(clamp(30px,3.7cqw,52px) * var(--np-fs,1)); font-weight:800; letter-spacing:-.03em; line-height:1.06;
+.title { font-size:var(--np-title,54px); font-weight:800; letter-spacing:-.03em; line-height:1.06;
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
-.artist { margin-top:8px; font-size:calc(clamp(18px,1.95cqw,25px) * var(--np-fs,1)); font-weight:650; color:rgba(255,255,255,.9);
+.artist { margin-top:8px; font-size:var(--np-artist,29px); font-weight:650; color:rgba(255,255,255,.9);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.album { margin-top:2px; font-size:calc(clamp(15px,1.5cqw,18px) * var(--np-fs,1)); color:rgba(255,255,255,.58);
+.album { margin-top:2px; font-size:var(--np-album,21px); color:rgba(255,255,255,.58);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.context { display:inline-flex; align-self:flex-start; align-items:center; gap:6px; max-width:100%; height:calc(30px * var(--np-fs,1));
+.context { display:inline-flex; align-self:flex-start; align-items:center; gap:6px; max-width:100%; height:30px;
   margin-top:12px; padding:0 12px 0 9px; border-radius:999px; background:rgba(255,255,255,.08);
-  color:rgba(255,255,255,.78); font-size:calc(12.5px * var(--np-fs,1)); font-weight:700; white-space:nowrap; overflow:hidden; }
+  color:rgba(255,255,255,.78); font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden; }
 .context:empty { display:none; }
-.context ha-icon { --mdc-icon-size:calc(16px * var(--np-fs,1)); color:var(--np-acc); flex:none; }
+.context ha-icon { --mdc-icon-size:16px; color:var(--np-acc); flex:none; }
 .progress { position:relative; display:block; width:100%; height:46px; }
 .progress:active { transform:none; }
 .progress[hidden] { display:none; }
@@ -130,7 +139,7 @@ ha-icon { pointer-events:none; }
 .thumb { position:absolute; top:17px; left:0; width:16px; height:16px; border-radius:50%; background:#fff;
   transform:translate(-50%,-50%); box-shadow:0 0 0 5px rgba(255,255,255,.14),0 2px 8px rgba(0,0,0,.4); }
 .times { position:absolute; top:28px; left:0; right:0; display:flex; justify-content:space-between;
-  font-size:calc(12.5px * var(--np-fs,1)); font-weight:650; color:rgba(255,255,255,.62); font-variant-numeric:tabular-nums; }
+  font-size:12.5px; font-weight:650; color:rgba(255,255,255,.62); font-variant-numeric:tabular-nums; }
 .transport { display:flex; align-items:center; justify-content:space-between; width:100%; padding:0 2px; }
 .btn { position:relative; display:grid; place-items:center; flex:none; border-radius:50%; color:rgba(255,255,255,.92); }
 .btn.sm { width:52px; height:52px; color:rgba(255,255,255,.62); }
@@ -183,9 +192,9 @@ ha-icon { pointer-events:none; }
   .cover-area:has(.pane) { width:100%; aspect-ratio:auto; height:min(64vh,460px); }
   .top { gap:8px; }
   .actions { margin-left:0; }
-  .title { font-size:calc(clamp(24px,7cqw,30px) * var(--np-fs,1)); }
-  .artist { font-size:calc(18px * var(--np-fs,1)); }
-  .album { font-size:calc(15px * var(--np-fs,1)); }
+  .title { font-size:min(var(--np-title,54px),9cqw); }
+  .artist { font-size:min(var(--np-artist,29px),5.4cqw); }
+  .album { font-size:min(var(--np-album,21px),4.4cqw); }
   .btn.md { width:52px; height:52px; }
   .btn.play { width:76px; height:76px; }
   .volume-row .btn { width:42px; height:42px; }
@@ -224,19 +233,20 @@ export class KioskNowPlayingCard extends HTMLElement {
   static getConfigForm() {
     const labels = getLanguage(document.querySelector('home-assistant')?.hass?.language).npEd;
     const bool = (name) => ({ name, selector: { boolean: {} }, default: true });
-    const scale = (name, def) => ({ name, default: def, selector: { number: { min: 0.5, max: 3, step: 0.05, mode: 'box' } } });
+    const scale = (name, def) => ({ name, default: def, selector: { number: { min: 10, max: 200, step: 1, mode: 'box', unit_of_measurement: 'px' } } });
     return {
       schema: [
         { name: 'config_entry_id', selector: { config_entry: { integration: 'music_assistant' } } },
-        { type: 'grid', name: '', schema: [
-          { name: 'height', selector: { number: { min: 420, max: 780, step: 10, mode: 'box', unit_of_measurement: 'px' } } },
-          { name: 'fill', selector: { boolean: {} } },
-        ] },
+        { name: 'height', selector: { number: { min: 0, max: 780, step: 10, mode: 'box', unit_of_measurement: 'px' } } },
         { type: 'expandable', name: '', title: labels.display, expanded: true, schema: [
-          bool('show_buttons'), bool('show_player'), bool('show_favorite'), bool('show_queue'), bool('show_lyrics'),
+          bool('show_buttons'), bool('show_progress'), bool('show_player'), bool('show_favorite'), bool('show_queue'), bool('show_lyrics'),
         ] },
-        { type: 'expandable', name: '', title: labels.text, expanded: true, schema: [
-          scale('font_scale', 1.15), scale('font_scale_no_buttons', 2),
+        { type: 'expandable', name: '', title: labels.textWith, expanded: true, schema: [
+          scale('title_size', TEXT_SIZES.title[0]), scale('artist_size', TEXT_SIZES.artist[0]), scale('album_size', TEXT_SIZES.album[0]),
+        ] },
+        { type: 'expandable', name: '', title: labels.textWithout, expanded: true, schema: [
+          scale('title_size_no_buttons', TEXT_SIZES.title[1]), scale('artist_size_no_buttons', TEXT_SIZES.artist[1]),
+          scale('album_size_no_buttons', TEXT_SIZES.album[1]),
         ] },
         { type: 'expandable', name: '', title: labels.advanced, schema: [
           { name: 'username', selector: { text: {} } },
@@ -253,7 +263,7 @@ export class KioskNowPlayingCard extends HTMLElement {
     this._cfg = Object.assign({ height: 560 }, config || {});
     this._signature = '';
     const shell = this.shadowRoot && this.shadowRoot.querySelector('.shell');
-    if (shell) shell._fs = null;
+    if (shell) shell._sizes = {};
     this._configuredPlayers = (Array.isArray(this._cfg.players) ? this._cfg.players : [])
       .filter((player) => player && typeof player.entity === 'string' && player.entity.startsWith('media_player.'));
     this._autoPlayers = null;
@@ -286,7 +296,7 @@ export class KioskNowPlayingCard extends HTMLElement {
 
   connectedCallback() {
     this._startProgressTimer();
-    if (this._cfg && this._cfg.fill === true && !this._resizeListener && this.shadowRoot.firstChild) {
+    if (this._auto && !this._resizeListener && this.shadowRoot.firstChild) {
       this._resizeListener = () => this._fillHeight();
       window.addEventListener('resize', this._resizeListener);
       this._filledHeight = null;
@@ -360,7 +370,7 @@ export class KioskNowPlayingCard extends HTMLElement {
       },
     });
     this._startProgressTimer();
-    if (this._cfg.fill === true) {
+    if (this._auto) {
       requestAnimationFrame(() => this._fillHeight());
       if (!this._resizeListener) {
         this._resizeListener = () => this._fillHeight();
@@ -369,10 +379,15 @@ export class KioskNowPlayingCard extends HTMLElement {
     }
   }
 
-  // fill: true -> use the screen height left below the top of the card, so a
+  // Auto height: `height: 0` (or the legacy `fill: true`) uses the screen height left below the card, so a
   // panel view on a 1280x800 kiosk gets a full-screen player.
+  get _auto() {
+    const cfg = this._cfg || {};
+    return cfg.fill === true || cfg.height === 0 || cfg.height === '0' || cfg.height === 'auto';
+  }
+
   _fillHeight() {
-    if (this._cfg.fill !== true || !this.isConnected) return;
+    if (!this._auto || !this.isConnected) return;
     const shell = this.shadowRoot && this.shadowRoot.querySelector('.shell');
     if (!shell) return;
     const margin = this._cfg.fill_margin == null ? 8 : Number(this._cfg.fill_margin) || 0;
@@ -477,10 +492,16 @@ export class KioskNowPlayingCard extends HTMLElement {
     const bare = this._cfg.show_buttons === false || (!!hideState && hideState.state === 'on');
     this.toggleAttribute('data-bare', bare);
     this.toggleAttribute('data-no-player', this._cfg.show_player === false);
-    const scale = Number(bare ? this._cfg.font_scale_no_buttons : this._cfg.font_scale);
-    const fontScale = Number.isFinite(scale) && scale > 0 ? scale : (bare ? 2 : 1.15);
+    this.toggleAttribute('data-no-progress', this._cfg.show_progress === false);
     const shell = this.shadowRoot.querySelector('.shell');
-    if (shell && shell._fs !== fontScale) { shell._fs = fontScale; shell.style.setProperty('--np-fs', String(fontScale)); }
+    if (shell) {
+      shell._sizes = shell._sizes || {};
+      for (const key of Object.keys(TEXT_SIZES)) {
+        const px = Number(this._cfg[`${key}_size${bare ? '_no_buttons' : ''}`]);
+        const size = Number.isFinite(px) && px > 0 ? px : TEXT_SIZES[key][bare ? 1 : 0];
+        if (shell._sizes[key] !== size) { shell._sizes[key] = size; shell.style.setProperty(`--np-${key}`, `${size}px`); }
+      }
+    }
     if (this._cfg.autofill_similar !== false) autofillSimilar(this, this._hass, entity, this._cfg.username);
     const state = this._state(entity);
     const attributes = (state && state.attributes) || {};

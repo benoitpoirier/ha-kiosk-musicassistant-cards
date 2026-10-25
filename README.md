@@ -265,19 +265,19 @@ favorite_accounts:
 | Option | Default | Description |
 | --- | --- | --- |
 | `config_entry_id` | none | Music Assistant config entry. Required for the queue preview and lyrics. |
-| `height` | `560` | Card height in pixels (420 to 780). |
-| `fill` | `false` | Fill the remaining screen height below the card (ignores `height`), e.g. a full-screen panel view on a kiosk. |
-| `fill_margin` | `8` | Bottom margin in pixels when `fill` is enabled. |
+| `height` | `560` | Card height in pixels (420 to 780). `0` (or `auto`) = Auto: fill the remaining screen height below the card, e.g. a full-screen panel view on a kiosk. The legacy `fill: true` still works. |
+| `fill_margin` | `8` | Bottom margin in pixels in Auto height. |
 | `language` | HA language | `en`, `fr` or `nl`. |
 | `players` | all Music Assistant players | Players to follow. The card shows the one that is playing (or the most recently paused). When several play at once, buttons let you choose. |
 | `volume_step` | `1` | Volume button step (%). The -/+ buttons repeat while held. |
 | `theme` | `sunset` | Accent colours, same names as the browser card `theme`. |
 | `autofill_similar` | `true` | When the track that plays is the last one of the queue, queue 10 similar tracks. |
-| `show_buttons` | `true` | `false` hides every button (player switch, favourite, queue, lyrics, transport, progress, volume). |
+| `show_buttons` | `true` | `false` hides every button (player switch, favourite, queue, lyrics, transport, volume). |
+| `show_progress` | `true` | Show the progress bar. It stays visible when the buttons are hidden and moves to the bottom of the column, larger. |
 | `show_player` | `true` | Show the current player pill. |
 | `show_favorite` / `show_queue` / `show_lyrics` | `true` | Show the favourite, queue and lyrics buttons. |
-| `font_scale` | `1.15` | Text size multiplier while the buttons are shown (1 = original size). |
-| `font_scale_no_buttons` | `2` | Text size multiplier while the buttons are hidden (`show_buttons: false` or the *Hide player buttons* switch is on). |
+| `title_size` / `artist_size` / `album_size` | `54` / `29` / `21` | Text sizes in px while the buttons are shown. |
+| `title_size_no_buttons` / `artist_size_no_buttons` / `album_size_no_buttons` | `100` / `50` / `36` | Text sizes in px while the buttons are hidden (`show_buttons: false` or the *Hide player buttons* switch is on). |
 | `username` | none | Music Assistant user used to look up similar tracks. | | none | Display names for Music Assistant provider instance ids (`spotify--xxxx`). The instance id is shown in Music Assistant under *Settings > Music providers*. |
 | `favorite_accounts` | none | Maps a provider instance id to a SpotifyPlus `media_player` to show a favourite (heart) button for the current track. |
 
