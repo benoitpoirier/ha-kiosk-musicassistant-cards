@@ -273,6 +273,8 @@ favorite_accounts:
 | `volume_step` | `1` | Volume button step (%). The -/+ buttons repeat while held. |
 | `theme` | `sunset` | Accent colours, same names as the browser card `theme`. |
 | `autofill_similar` | `true` | When the track that plays is the last one of the queue, queue 10 similar tracks. |
+| `hide_controls_entity` | none | Entity (e.g. an `input_boolean`) that hides every control (transport, progress, volume, actions) while its state equals `hide_controls_state`. Drive it from a Home Assistant automation, for example while a screensaver is active. |
+| `hide_controls_state` | `on` | State of `hide_controls_entity` that hides the controls. |
 | `username` | none | Music Assistant user used to look up similar tracks. | | none | Display names for Music Assistant provider instance ids (`spotify--xxxx`). The instance id is shown in Music Assistant under *Settings > Music providers*. |
 | `favorite_accounts` | none | Maps a provider instance id to a SpotifyPlus `media_player` to show a favourite (heart) button for the current track. |
 

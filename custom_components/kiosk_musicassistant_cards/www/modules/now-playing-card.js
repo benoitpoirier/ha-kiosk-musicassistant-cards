@@ -8,6 +8,7 @@ const QUEUE_PAGE = 25;
 const NOW_PLAYING_STYLE = `
 :host { display:block; width:100%; color:#fff; container-type:inline-size; container-name:np;
   --np-acc:#f6b26b; --np-acc2:#e5739b; }
+:host([data-bare]) :is(.players, .actions, .transport, .bottom, .progress) { display:none !important; }
 * { box-sizing:border-box; }
 button { font:inherit; color:inherit; border:0; background:none; padding:0; margin:0; cursor:pointer;
   -webkit-tap-highlight-color:transparent;
@@ -412,6 +413,10 @@ export class KioskNowPlayingCard extends HTMLElement {
     if (!this.shadowRoot || !this.shadowRoot.getElementById('title')) return;
     const entity = this._activeEntity();
     this._entity = entity;
+    // An entity driven by an HA automation (e.g. an input_boolean) hides every control.
+    const hideEntity = this._cfg.hide_controls_entity;
+    const hideState = this._state(hideEntity);
+    this.toggleAttribute('data-bare', !!hideEntity && !!hideState && hideState.state === String(this._cfg.hide_controls_state || 'on'));
     if (this._cfg.autofill_similar !== false) autofillSimilar(this, this._hass, entity, this._cfg.username);
     const state = this._state(entity);
     const attributes = (state && state.attributes) || {};
