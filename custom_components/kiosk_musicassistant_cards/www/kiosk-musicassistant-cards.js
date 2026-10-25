@@ -1,10 +1,10 @@
 // Entry point. Home Assistant loads this resource as a JavaScript module.
 // Sub-modules are imported with the same ?v= query so a new version never reuses cached files.
-const VERSION = '1.7.2';
+const VERSION = '1.7.3';
 const Q = `?v=${VERSION}`;
 const { MusicAssistantTouchCard } = await import(`./modules/browser-card.js${Q}`);
 const { MusicAssistantTouchCardEditor } = await import(`./modules/card-editor.js${Q}`);
-const { KioskNowPlayingCard } = await import(`./modules/now-playing-card.js${Q}`);
+const { KioskNowPlayingCard, KioskNowPlayingEditor } = await import(`./modules/now-playing-card.js${Q}`);
 
 const DOCS = 'https://github.com/benoitpoirier/ha-kiosk-musicassistant-cards';
 
@@ -12,6 +12,7 @@ const elements = [
   ['kiosk-musicassistant-card-editor', MusicAssistantTouchCardEditor],
   ['kiosk-musicassistant-card', MusicAssistantTouchCard],
   ['kiosk-musicassistant-now-playing', KioskNowPlayingCard],
+  ['kiosk-musicassistant-now-playing-editor', KioskNowPlayingEditor],
 ];
 for (const [tag, element] of elements) {
   if (!customElements.get(tag)) customElements.define(tag, element);

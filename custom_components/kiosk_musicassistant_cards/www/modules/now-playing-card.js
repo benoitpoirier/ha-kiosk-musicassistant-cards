@@ -203,6 +203,52 @@ ha-icon { pointer-events:none; }
 }
 `;
 
+const findHideSwitch = (states) => Object.values(states || {})
+  .find((s) => s.entity_id.startsWith('switch.') && (s.attributes || {}).kiosk_card_role === 'hide_controls');
+
+// "Show buttons" mirrors the live hide switch (not the saved config) and drives it.
+export class KioskNowPlayingEditor extends HTMLElement {
+  setConfig(config) { this._config = config || {}; this._render(); }
+
+  set hass(hass) { this._hass = hass; this._render(); }
+
+  _render() {
+    if (!this._hass || !this._config) return;
+    if (!this._form) {
+      this._form = document.createElement('ha-form');
+      this._form.addEventListener('value-changed', (event) => this._changed(event));
+      this.appendChild(this._form);
+    }
+    const labels = getLanguage(this._hass.language).npEd;
+    const hide = findHideSwitch(this._hass.states);
+    const data = Object.assign({}, this._config, hide ? { show_buttons: hide.state !== 'on' } : {});
+    const key = JSON.stringify(data);
+    if (this._key === key && this._form.hass === this._hass) return;
+    this._key = key;
+    const form = KioskNowPlayingCard.getConfigForm();
+    this._form.hass = this._hass;
+    this._form.schema = form.schema;
+    this._form.computeLabel = (schema) => labels[schema.name] || schema.name;
+    this._form.computeHelper = (schema) => labels[`${schema.name}_help`] || '';
+    this._form.data = data;
+  }
+
+  _changed(event) {
+    event.stopPropagation();
+    const value = Object.assign({}, event.detail.value);
+    const hide = findHideSwitch(this._hass.states);
+    if (hide) {
+      const wantHidden = value.show_buttons === false;
+      if ((hide.state === 'on') !== wantHidden) {
+        this._hass.callService('switch', wantHidden ? 'turn_on' : 'turn_off', { entity_id: hide.entity_id });
+      }
+      delete value.show_buttons;
+    }
+    this._config = value;
+    this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: value }, bubbles: true, composed: true }));
+  }
+}
+
 export class KioskNowPlayingCard extends HTMLElement {
   constructor() {
     super();
@@ -230,13 +276,10 @@ export class KioskNowPlayingCard extends HTMLElement {
     return stub;
   }
 
+  static getConfigElement() { return document.createElement('kiosk-musicassistant-now-playing-editor'); }
+
   static getConfigForm() {
     const labels = getLanguage(document.querySelector('home-assistant')?.hass?.language).npEd;
-    const hass = document.querySelector('home-assistant')?.hass;
-    const hideSwitch = Object.values((hass && hass.states) || {})
-      .find((s) => s.entity_id.startsWith('switch.') && (s.attributes || {}).kiosk_card_role === 'hide_controls');
-    // Show the real display state when the stored value is unset.
-    const buttons = { name: 'show_buttons', selector: { boolean: {} }, default: hideSwitch ? hideSwitch.state !== 'on' : true };
     const bool = (name) => ({ name, selector: { boolean: {} }, default: true });
     const scale = (name, def) => ({ name, default: def, selector: { number: { min: 10, max: 200, step: 1, mode: 'box', unit_of_measurement: 'px' } } });
     return {
@@ -244,7 +287,7 @@ export class KioskNowPlayingCard extends HTMLElement {
         { name: 'config_entry_id', selector: { config_entry: { integration: 'music_assistant' } } },
         { name: 'height', selector: { number: { min: 0, max: 780, step: 10, mode: 'box', unit_of_measurement: 'px' } } },
         { type: 'expandable', name: '', title: labels.display, expanded: true, schema: [
-          buttons, bool('show_progress'), bool('show_player'), bool('show_favorite'), bool('show_queue'), bool('show_lyrics'),
+          bool('show_buttons'), bool('show_progress'), bool('show_player'), bool('show_favorite'), bool('show_queue'), bool('show_lyrics'),
         ] },
         { type: 'expandable', name: '', title: labels.textWith, expanded: true, schema: [
           scale('title_size', TEXT_SIZES.title[0]), scale('artist_size', TEXT_SIZES.artist[0]), scale('album_size', TEXT_SIZES.album[0]),
@@ -265,16 +308,7 @@ export class KioskNowPlayingCard extends HTMLElement {
   }
 
   setConfig(config) {
-    const previous = this._cfg;
     this._cfg = Object.assign({ height: 560 }, config || {});
-    // Toggling show_buttons in the editor drives the hide switch, which is the real display state.
-    if (previous && this._cfg.show_buttons !== previous.show_buttons) {
-      const hide = this._hideSwitchState();
-      const wantHidden = this._cfg.show_buttons === false;
-      if (hide && (hide.state === 'on') !== wantHidden) {
-        this._hass.callService('switch', wantHidden ? 'turn_on' : 'turn_off', { entity_id: hide.entity_id });
-      }
-    }
     this._signature = '';
     const shell = this.shadowRoot && this.shadowRoot.querySelector('.shell');
     if (shell) shell._sizes = {};
