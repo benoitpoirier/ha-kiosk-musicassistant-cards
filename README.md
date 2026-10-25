@@ -273,6 +273,11 @@ favorite_accounts:
 | `volume_step` | `1` | Volume button step (%). The -/+ buttons repeat while held. |
 | `theme` | `sunset` | Accent colours, same names as the browser card `theme`. |
 | `autofill_similar` | `true` | When the track that plays is the last one of the queue, queue 10 similar tracks. |
+| `show_buttons` | `true` | `false` hides every button (player switch, favourite, queue, lyrics, transport, progress, volume). |
+| `show_player` | `true` | Show the current player pill. |
+| `show_favorite` / `show_queue` / `show_lyrics` | `true` | Show the favourite, queue and lyrics buttons. |
+| `font_scale` | `1.15` | Text size multiplier while the buttons are shown (1 = original size). |
+| `font_scale_no_buttons` | `2` | Text size multiplier while the buttons are hidden (`show_buttons: false` or `hide_controls_entity`). |
 | `hide_controls_entity` | none | Entity (e.g. an `input_boolean`) that hides every control (transport, progress, volume, actions) while its state equals `hide_controls_state`. Drive it from a Home Assistant automation, for example while a screensaver is active. |
 | `hide_controls_state` | `on` | State of `hide_controls_entity` that hides the controls. |
 | `username` | none | Music Assistant user used to look up similar tracks. | | none | Display names for Music Assistant provider instance ids (`spotify--xxxx`). The instance id is shown in Music Assistant under *Settings > Music providers*. |
