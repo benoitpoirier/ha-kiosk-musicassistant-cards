@@ -13,7 +13,7 @@ The package is a Home Assistant custom integration that:
 
 ## Why you will like it
 
-- **Multi-player**: group your speakers in zones and switch between them with one tap. The card follows whichever player is playing.
+- **Multi-player**: pick your speakers from Music Assistant's own player list (one entry per device, whatever the protocol), group them and switch between them with one tap. The card follows whichever player is playing.
 - **Multi-source**: browse and search the whole Music Assistant library (Spotify, Tidal, YouTube Music, Deezer, local files, radios...) from one place. Each source can be tied to a Music Assistant user, so every family member gets their own library and recommendations.
 - **Discover tab**: fresh recommendations right in the browser, built from similar tracks of your listening history and from Music Assistant's own rows. It works with any provider and does not require Spotify.
 - **Smart queue**: play a single track and similar tracks are queued behind it once it has started, so the music never stops and playback is never delayed.
@@ -21,7 +21,8 @@ The package is a Home Assistant custom integration that:
 - **Synchronised lyrics** that scroll with the music, shown only when time-coded lyrics are available.
 - **8 colour themes** (sunset, spotify, ocean, aurora, neon, ember, graphite, daylight), with accents shared by both cards.
 - **Touch first**: big targets, an on-screen keyboard for search, a light non-blocking playback pill, and a layout tuned for 1280×800 kiosks that also adapts to phones in portrait.
-- **Fully configurable**: a visual editor for the browser card and plain YAML options for everything else (zones, sources, categories, theme, language, height, discovery, queue behaviour...).
+- **Fully configurable**: visual editors for both cards, and YAML options for everything (zones, sources, categories, theme, language, height, discovery, queue behaviour...).
+- **Kiosk automations that don't break**: a *Music playing* sensor follows Music Assistant itself, and a *Hide player buttons* switch turns the now-playing card into a clean display.
 - **Zero setup on the frontend**: installed through HACS, loaded automatically, no Lovelace resource to add and no build step. Available in English, French and Dutch.
 - **Safe by design**: Music Assistant's token never reaches the browser; the cards reuse Home Assistant's authenticated client.
 
@@ -283,7 +284,7 @@ favorite_accounts:
 | `show_favorite` / `show_queue` / `show_lyrics` | `true` | Show the favourite, queue and lyrics buttons. |
 | `title_size` / `artist_size` / `album_size` | `54` / `29` / `21` | Text sizes in px while the buttons are shown. |
 | `title_size_no_buttons` / `artist_size_no_buttons` / `album_size_no_buttons` | `100` / `50` / `36` | Text sizes in px while the buttons are hidden (`show_buttons: false` or the *Hide player buttons* switch is on). |
-| `username` | none | Music Assistant user used to look up similar tracks. | | none | Display names for Music Assistant provider instance ids (`spotify--xxxx`). The instance id is shown in Music Assistant under *Settings > Music providers*. |
+| `username` | none | Music Assistant user used to look up similar tracks. Overrides `follow_source`. |
 | `favorite_accounts` | none | Maps a provider instance id to a SpotifyPlus `media_player` to show a favourite (heart) button for the current track. |
 
 Synchronised lyrics are shown only when Music Assistant provides time-stamped (LRC) lyrics for the current track.
@@ -307,6 +308,8 @@ actions:
 The integration creates a *Music playing* binary sensor that is on while any available, enabled Music Assistant player or group is playing. It reads Music Assistant's player list directly rather than watching a fixed list of Home Assistant `media_player` entity ids. This matters because Music Assistant can recreate a player under a new id (for example, `media_player.denon_avr_x3500h_3` becoming `_4`), and one physical device can also have several Home Assistant entities. The sensor follows every Music Assistant player and group, regardless of those entity ids.
 
 Its `players`, `player_ids` and `entity_ids` attributes list the currently playing players by name, Music Assistant id and matching Home Assistant entity id. The sensor becomes unavailable when Music Assistant is disconnected.
+
+Entity ids follow the language Home Assistant had when the integration was added: `binary_sensor.kiosk_music_assistant_cards_music_playing` and `switch.kiosk_music_assistant_cards_hide_player_buttons` in English, `binary_sensor.kiosk_music_assistant_cards_musique_en_cours` and `switch.kiosk_music_assistant_cards_masquer_les_boutons_du_lecteur` in French. Check yours under *Settings > Devices > Kiosk Music Assistant Cards*.
 
 Use the state trigger to show the kiosk dashboard when music starts, and also check the sensor after Home Assistant starts. When it has been off for 30 seconds, return to the screensaver mode. Replace the example select entity and option names with those provided by your kiosk integration.
 
@@ -349,22 +352,29 @@ automation:
 
 This setup runs on an Echo Show 8 with the *Kiosk Satellite* app. A `dashboard-kiosk` dashboard uses panel views: `menu` (home), `lecture` (now-playing card) and `music-browser` (browser card). Four automations turn the tablet into a music display:
 
-- while music plays, the screensaver shows the now-playing view instead of the weather, without dimming;
-- when the music stops, the weather screensaver and dimming come back;
+- while music plays anywhere in the house, the screensaver shows the now-playing view instead of the weather, without dimming;
+- when nothing has played for 30 seconds, the weather screensaver and dimming come back;
 - when the screen wakes up, it opens the now-playing view if music is playing, otherwise the menu;
 - while the screensaver is on, the player buttons are hidden, leaving a large cover and title readable from across the room.
 
-Replace `echo_show_8` with the name of your Kiosk Satellite device, and the `media_player` entities with your Music Assistant players. In Kiosk Satellite, set the *Home Assistant Dashboard* screensaver to the `dashboard-kiosk/lecture` view.
+The automations never name a speaker: they watch the [Music playing sensor](#music-playing-sensor), which follows Music Assistant itself. They keep working when Music Assistant re-creates a player under a new entity id, they cover every room and group, and the weather does not come back while another speaker is still playing. To react to one room only, add a condition on the sensor's `entity_ids` or `players` attribute.
+
+Replace `echo_show_8` with the name of your Kiosk Satellite device, and the sensor and switch ids with yours (see the note on entity ids above). In Kiosk Satellite, set the *Home Assistant Dashboard* screensaver to the `dashboard-kiosk/lecture` view.
 
 ```yaml
 - id: kiosk_music_start
   alias: Kiosk - music starts, now-playing screensaver
   triggers:
     - trigger: state
-      entity_id: &kiosk_players
-        - media_player.echo_show_8_2
-        - media_player.denon_avr_x3500h_3
-      to: [playing, buffering]
+      entity_id: binary_sensor.kiosk_music_assistant_cards_music_playing
+      to: "on"
+    # Music already playing when Home Assistant restarts.
+    - trigger: homeassistant
+      event: start
+  conditions:
+    - condition: state
+      entity_id: binary_sensor.kiosk_music_assistant_cards_music_playing
+      state: "on"
   actions:
     - action: select.select_option
       target:
@@ -379,17 +389,12 @@ Replace `echo_show_8` with the name of your Kiosk Satellite device, and the `med
 - id: kiosk_music_end
   alias: Kiosk - music stops, weather screensaver
   triggers:
+    # 30 s absorb track changes and short pauses.
     - trigger: state
-      entity_id: *kiosk_players
-      to: [paused, idle, "off", standby]
-      from: null  # state changes only, not attribute updates
-  conditions:
-    - condition: not
-      conditions:
-        - condition: state
-          entity_id: *kiosk_players
-          state: playing
-          match: any
+      entity_id: binary_sensor.kiosk_music_assistant_cards_music_playing
+      from: "on"
+      to: "off"
+      for: "00:00:30"
   actions:
     - action: select.select_option
       target:
@@ -418,8 +423,7 @@ Replace `echo_show_8` with the name of your Kiosk Satellite device, and the `med
     - variables:
         target: >-
           {{ 'dashboard-kiosk/lecture'
-             if is_state('media_player.echo_show_8_2', 'playing')
-             or is_state('media_player.denon_avr_x3500h_3', 'playing')
+             if is_state('binary_sensor.kiosk_music_assistant_cards_music_playing', 'on')
              else 'dashboard-kiosk/menu' }}
     # On start, only prepare the now-playing view behind the screensaver.
     - condition: template
@@ -451,6 +455,8 @@ Replace `echo_show_8` with the name of your Kiosk Satellite device, and the `med
 ```
 
 Kiosk Satellite keeps control of when the screensaver starts (its inactivity timeout): the automations only choose what it shows and never force it on.
+
+The cards on this dashboard need no speaker entity ids either: the browser card `zones` and the now-playing card `players` list Music Assistant players, picked in the visual editors, and the now-playing card follows the music source chosen in the browser card (`follow_source`).
 
 ## Actions
 
