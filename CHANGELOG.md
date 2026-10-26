@@ -2,7 +2,7 @@
 
 All notable changes to Kiosk Music Assistant Cards, newest first, grouped by minor version.
 
-## 1.10 (1.10.0, in progress)
+## 1.10 (1.10.0 to 1.10.1)
 
 **Every person gets their own music**
 
@@ -11,6 +11,7 @@ All notable changes to Kiosk Music Assistant Cards, newest first, grouped by min
 - **Switching person is instant.** The recommendations of the other people are prepared in the background, and they are kept across Home Assistant restarts. *No more 15-45 s wait after a restart or the first switch of the day.*
 - **No more jumping rows**: while new recommendations load, their place is kept at the top, so the rows below stay still.
 - **One person for the whole dashboard**: the Now Playing screen follows the person picked in the browser card (new `follow_source` option, on by default), so the similar songs it adds come from the right history.
+- **Simpler Now Playing screen**: the badge showing where the music comes from is gone, since it always read "Music Assistant" (the `provider_names` option is no longer used).
 
 ## 1.9 (1.9.0 to 1.9.1)
 

@@ -261,9 +261,6 @@ players:
     entity: media_player.living_room
   - name: Kitchen
     entity: media_player.kitchen
-provider_names:
-  spotify--abc123: Spotify · Alice
-  spotify--def456: Spotify · Bob
 favorite_accounts:
   spotify--abc123: media_player.spotifyplus_alice
 ```

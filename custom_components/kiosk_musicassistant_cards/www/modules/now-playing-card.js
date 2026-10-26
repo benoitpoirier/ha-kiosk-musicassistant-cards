@@ -125,11 +125,6 @@ ha-icon { pointer-events:none; }
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .album { margin-top:2px; font-size:var(--np-album,21px); color:rgba(255,255,255,.58);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.context { display:inline-flex; align-self:flex-start; align-items:center; gap:6px; max-width:100%; height:30px;
-  margin-top:12px; padding:0 12px 0 9px; border-radius:999px; background:rgba(255,255,255,.08);
-  color:rgba(255,255,255,.78); font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden; }
-.context:empty { display:none; }
-.context ha-icon { --mdc-icon-size:16px; color:var(--np-acc); flex:none; }
 .progress { position:relative; display:block; width:100%; height:46px; }
 .progress:active { transform:none; }
 .progress[hidden] { display:none; }
@@ -184,7 +179,6 @@ ha-icon { pointer-events:none; }
   .side { width:100%; height:auto; gap:18px; }
   .top { justify-content:center; }
   .meta { align-items:center; text-align:center; }
-  .context { align-self:center; }
   .btn.sm { width:46px; height:46px; }
 }
 /* portrait phone */
@@ -475,7 +469,6 @@ export class KioskNowPlayingCard extends HTMLElement {
                 <div class="title" id="title"></div>
                 <div class="artist" id="artist"></div>
                 <div class="album" id="album"></div>
-                <div class="context" id="context"></div>
               </div>
               <button class="progress" data-act="seek" id="progress" aria-label="${esc(t.seek)}">
                 <span class="track"><span class="fill" id="fill"></span></span><span class="thumb" id="thumb"></span>
@@ -590,25 +583,6 @@ export class KioskNowPlayingCard extends HTMLElement {
       return this._selected;
     }
     return this._selected || (this._players[0] && this._players[0].entity) || null;
-  }
-
-  _provider(attributes) {
-    const uri = String(attributes.media_content_id || '');
-    const queueProvider = String((this._queueContext && this._queueContext.provider) || '');
-    const scheme = String(queueProvider || uri.split('://')[0] || '').toLowerCase();
-    const names = this._cfg.provider_names || {};
-    const named = Object.keys(names).find((key) => key.toLowerCase() === scheme);
-    if (named) return String(names[named]);
-    if (scheme.includes('spotify')) return 'Spotify';
-    if (scheme.includes('youtube')) return 'YouTube Music';
-    if (scheme.includes('jellyfin')) return 'Jellyfin';
-    if (scheme.includes('plex')) return 'Plex';
-    if (queueProvider) {
-      return queueProvider.replace(/^spotify--/i, 'Spotify ')
-        .replace(/[-_]+/g, ' ').replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
-    }
-    if (attributes.active_queue) return 'Music Assistant';
-    return String(attributes.source || attributes.app_id || this._getTranslations().external);
   }
 
   _favoriteAccount(provider) {
@@ -923,7 +897,6 @@ export class KioskNowPlayingCard extends HTMLElement {
       const current = this._state(player.entity);
       return current && ['playing', 'buffering'].includes(current.state);
     }));
-    const provider = this._provider(attributes);
 
     const statusEl = $('status');
     statusEl.classList.toggle('playing', !!playing);
@@ -973,9 +946,6 @@ export class KioskNowPlayingCard extends HTMLElement {
     $('title').textContent = title;
     $('artist').textContent = artist;
     $('album').textContent = album && album !== title ? album : '';
-    const providerIcon = /spotify/i.test(provider) ? 'mdi:spotify'
-      : /youtube/i.test(provider) ? 'mdi:youtube' : /radio/i.test(provider) ? 'mdi:radio' : 'mdi:music-circle-outline';
-    this._patch('context', provider ? `${svg(providerIcon)}<span>${esc(provider)}</span>` : '');
 
     const duration = Number(attributes.media_duration) || 0;
     const progress = $('progress');

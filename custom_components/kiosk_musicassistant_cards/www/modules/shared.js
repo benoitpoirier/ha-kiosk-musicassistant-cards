@@ -150,7 +150,7 @@ export const TAAL = {
       favAdd: 'Add to favourites', favRemove: 'Remove from favourites',
       queue: 'Queue', lyrics: 'Lyrics', volDown: 'Volume down', volUp: 'Volume up',
       queueLoading: 'Loading queue…', queueEmpty: 'Queue empty or unavailable',
-      track: 'Track', external: 'External source', nowLabel: 'Now playing', nextLabel: 'Up next', remove: 'Remove from queue',
+      track: 'Track', nowLabel: 'Now playing', nextLabel: 'Up next', remove: 'Remove from queue',
     },
     npEd: {
       display: 'Display', textWith: 'Text size with buttons', textWithout: 'Text size without buttons', advanced: 'Advanced',
@@ -270,7 +270,7 @@ export const TAAL = {
       favAdd: 'Toevoegen aan favorieten', favRemove: 'Verwijderen uit favorieten',
       queue: 'Wachtrij', lyrics: 'Songtekst', volDown: 'Zachter', volUp: 'Harder',
       queueLoading: 'Wachtrij ophalen…', queueEmpty: 'Wachtrij leeg of niet beschikbaar',
-      track: 'Nummer', external: 'Externe bron', nowLabel: 'Speelt nu', nextLabel: 'Hierna', remove: 'Uit wachtrij verwijderen',
+      track: 'Nummer', nowLabel: 'Speelt nu', nextLabel: 'Hierna', remove: 'Uit wachtrij verwijderen',
     },
     npEd: {
       display: 'Weergave', textWith: 'Tekstgrootte met knoppen', textWithout: 'Tekstgrootte zonder knoppen', advanced: 'Geavanceerd',
@@ -392,7 +392,7 @@ export const TAAL = {
       favAdd: 'Ajouter aux favoris', favRemove: 'Retirer des favoris',
       queue: 'File d’attente', lyrics: 'Paroles', volDown: 'Baisser le volume',
       volUp: 'Augmenter le volume', queueLoading: 'Chargement de la file…',
-      queueEmpty: 'File vide ou indisponible', track: 'Titre', external: 'Source externe',
+      queueEmpty: 'File vide ou indisponible', track: 'Titre',
       nowLabel: 'En cours', nextLabel: 'À suivre', remove: 'Retirer de la file',
     },
     npEd: {
