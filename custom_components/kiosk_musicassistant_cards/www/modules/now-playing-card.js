@@ -1,7 +1,7 @@
 const Q = new URL(import.meta.url).search;
 const { safeImageUrl, VOLUME_CSS, esc, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay, autofillSimilar } = await import(`./shared.js${Q}`);
 const { THEME_COLORS } = await import(`./kiosk-theme.js${Q}`);
-const { listMaPlayers, isMaPlayer, maPlayerOptions } = await import(`./players.js${Q}`);
+const { listMaPlayers, isMaPlayer, maPlayerOptions, configuredPlayers, dropFollowers } = await import(`./players.js${Q}`);
 
 const DOMAIN = 'kiosk_musicassistant_cards';
 const QUEUE_PAGE = 25;
@@ -221,7 +221,7 @@ export class KioskNowPlayingEditor extends HTMLElement {
       this.appendChild(this._form);
     }
     const labels = getLanguage(this._hass.language).npEd;
-    const configuredIds = (Array.isArray(this._config.players) ? this._config.players : [])
+    const configuredIds = configuredPlayers(this._config)
       .map((player) => player && player.entity).filter(Boolean);
     const playerOptions = maPlayerOptions(this._hass, configuredIds, labels.groep);
     const invalidIds = configuredIds.filter((id) => !isMaPlayer(this._hass.states[id]));
@@ -264,10 +264,11 @@ export class KioskNowPlayingEditor extends HTMLElement {
       }
       delete value.show_buttons;
     }
-    const existing = Array.isArray(this._config.players) ? this._config.players : [];
+    const existing = configuredPlayers(this._config);
     const ids = [].concat(value.players || []).filter(Boolean);
     if (ids.length) value.players = ids.map((id) => existing.find((player) => player && player.entity === id) || { entity: id });
     else delete value.players;
+    delete value.zones;
     this._config = value;
     this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: value }, bubbles: true, composed: true }));
   }
@@ -336,7 +337,7 @@ export class KioskNowPlayingCard extends HTMLElement {
     this._signature = '';
     const shell = this.shadowRoot && this.shadowRoot.querySelector('.shell');
     if (shell) shell._sizes = {};
-    this._configuredPlayers = (Array.isArray(this._cfg.players) ? this._cfg.players : [])
+    this._configuredPlayers = configuredPlayers(this._cfg)
       .filter((player) => player && typeof player.entity === 'string' && player.entity.startsWith('media_player.'));
     this._autoPlayers = null;
     this._selected = this._configuredPlayers[0] ? this._configuredPlayers[0].entity : null;
@@ -494,19 +495,19 @@ export class KioskNowPlayingCard extends HTMLElement {
   }
 
   _activeEntity() {
-    const playing = this._players.filter((player) => {
+    const playing = dropFollowers(this._hass, this._players.filter((player) => {
       const state = this._state(player.entity);
       return state && ['playing', 'buffering'].includes(state.state);
-    });
+    }));
     if (playing.length) {
       const selected = playing.find((player) => player.entity === this._selected);
       this._selected = (selected || playing[0]).entity;
       return this._selected;
     }
-    const paused = this._players.filter((player) => {
+    const paused = dropFollowers(this._hass, this._players.filter((player) => {
       const state = this._state(player.entity);
       return state && state.state === 'paused';
-    }).sort((left, right) => {
+    })).sort((left, right) => {
       const a = Date.parse((this._state(left.entity) || {}).last_changed || '') || 0;
       const b = Date.parse((this._state(right.entity) || {}).last_changed || '') || 0;
       return b - a;
@@ -843,10 +844,10 @@ export class KioskNowPlayingCard extends HTMLElement {
     const artist = attributes.media_artist || '';
     const album = attributes.media_album_name || '';
     const playerName = attributes.friendly_name || configured.name || entity || '';
-    const activePlayers = this._players.filter((player) => {
+    const activePlayers = dropFollowers(this._hass, this._players.filter((player) => {
       const current = this._state(player.entity);
       return current && ['playing', 'buffering'].includes(current.state);
-    });
+    }));
     const provider = this._provider(attributes);
 
     const statusEl = $('status');

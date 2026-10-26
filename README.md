@@ -89,7 +89,7 @@ type: custom:kiosk-musicassistant-card
 config_entry_id: <your_music_assistant_config_entry_id>
 ```
 
-Without `zones`, every Music Assistant player is listed. Without `categories`, four default categories are used (top picks, recently played, recently added, playlists).
+Without `zones`, every Music Assistant player is listed. Without `categories`, four default categories are used (top picks, recently played, recently added, playlists). Both cards accept `zones` or `players` with the same item format; a player synced to a group is followed through its group leader.
 
 ### Full example
 
@@ -189,13 +189,15 @@ links:
 | --- | --- |
 | `name`, `icon` | Label and icon of the button. |
 | `entity` | Music Assistant `media_player` to play on. |
-| `volume` | Optional `media_player` controlled by the volume slider (e.g. an amplifier). |
+| `volume` *(legacy YAML)* | Optional `media_player` that receives volume-slider changes (e.g. an amplifier). Still honoured; prefer the Music Assistant per-player volume control setting. |
 | `volume_max`, `volume_start`, `volume_step` | Per-zone overrides of the general options. |
+| `group_with` | List of Music Assistant players to join to this zone's player before playing, using Music Assistant groups. |
+| `solo` | Detach this zone's player from any group before playing. |
 | `before.turn_off` | Player to switch off before playing on this zone. |
-| `before.unjoin` | Player to detach from its group first. |
-| `before.join.leader` / `before.join.members` | Group these players before playing. |
+| `before.unjoin` *(legacy YAML)* | Still honoured. The visual editor converts it to `solo` when its player is the zone player. |
+| `before.join.leader` / `before.join.members` *(legacy YAML)* | Still honoured. The visual editor converts it to `group_with` when the leader is the zone player. |
 
-Use Music Assistant players for playback, with one MA player per physical device. MA merges a device's protocols and chooses the output protocol itself (for example HEOS, AirPlay or DLNA). The visual editors list MA players and flag configured non-MA entities with a suggested replacement when one can be matched.
+Use Music Assistant players for playback, with one MA player per physical device. MA merges a device's protocols and chooses the output protocol itself (for example HEOS, AirPlay or DLNA). The visual editors list MA players and flag configured non-MA entities with a suggested replacement when one can be matched. A player synced to a group is followed through its group leader.
 
 ### `music_sources` (Music Assistant users)
 

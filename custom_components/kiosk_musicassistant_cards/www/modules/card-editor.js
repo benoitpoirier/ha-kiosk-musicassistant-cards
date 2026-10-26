@@ -274,48 +274,59 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
     zoneSection.innerHTML = `<div class="heading">${editorText.zones}</div>`;
     const zones = config.zones || [];
     zones.forEach((z, i) => {
+      const b = z.before || {};
+      const groupWithIds = Array.isArray(z.group_with) ? z.group_with
+        : (b.join && b.join.leader === z.entity && Array.isArray(b.join.members)
+          ? b.join.members.filter((id) => id !== z.entity) : []);
       const zSchema = [
         { name: '', type: 'grid', schema: [
           { name: 'name', selector: { text: {} } },
           { name: 'icon', selector: { icon: {} } },
         ] },
         { name: 'entity', selector: { select: { mode: 'dropdown', options: maPlayerOptions(this._hass, [z.entity], editorText.groep) } } },
-        { name: 'volume', selector: { entity: { filter: { domain: 'media_player' } } } },
         { name: '', type: 'grid', schema: [
           { name: 'volume_max', selector: { number: { min: 5, max: 100, step: 1, mode: 'box' } } },
           { name: 'volume_start', selector: { number: { min: 0, max: 100, step: 1, mode: 'box' } } },
           { name: 'volume_step', selector: { number: { min: 0.1, max: 100, step: 0.1, mode: 'box' } } },
         ] },
-        { name: 'turn_off', selector: { entity: { filter: { domain: 'media_player' } } } },
-        { name: 'unjoin', selector: { entity: { filter: { domain: 'media_player' } } } },
-        { name: 'joinLeader', selector: { entity: { filter: { domain: 'media_player' } } } },
-        { name: 'joinMembers',
-          selector: { entity: { multiple: true, filter: { domain: 'media_player' } } } },
+        { name: 'group_with', selector: { select: { multiple: true, mode: 'dropdown',
+          options: maPlayerOptions(this._hass, groupWithIds, editorText.groep).filter((option) => option.value !== z.entity) } } },
+        { name: 'solo', selector: { boolean: {} } },
+        { name: 'turn_off', selector: { select: { mode: 'dropdown', options: [
+          { value: '', label: editorText.geen },
+          ...maPlayerOptions(this._hass, [b.turn_off], editorText.groep),
+        ] } } },
       ];
-      const b = z.before || {};
       const zoneFormData = {
         name: z.name || '', icon: this._iconHtml(z.icon), entity: z.entity || '',
-        volume: z.volume || '', volume_max: z.volume_max == null ? null : z.volume_max,
+        volume_max: z.volume_max == null ? null : z.volume_max,
         volume_start: z.volume_start == null ? null : z.volume_start,
         volume_step: z.volume_step == null ? null : z.volume_step,
-        turn_off: b.turn_off || '', unjoin: b.unjoin || '',
-        joinLeader: (b.join && b.join.leader) || '',
-        joinMembers: (b.join && b.join.members) || [],
+        group_with: groupWithIds,
+        solo: !!z.solo || b.unjoin === z.entity,
+        turn_off: b.turn_off || '',
       };
       const form = this._appendForm(zSchema, zoneFormData, (v) => {
-        const zoneConfig = { name: v.name, entity: v.entity };
+        const currentZone = (this._cfg.zones || [])[i] || z;
+        const zoneConfig = Object.assign({}, currentZone, { name: v.name, entity: v.entity });
         if (v.icon) zoneConfig.icon = v.icon;
-        if (v.volume) zoneConfig.volume = v.volume;
-        if (v.volume_max != null && v.volume_max !== '') zoneConfig.volume_max = v.volume_max;
-        if (v.volume_start != null && v.volume_start !== '') zoneConfig.volume_start = v.volume_start;
-        if (v.volume_step != null && v.volume_step !== '') zoneConfig.volume_step = v.volume_step;
-        const beforeConfig = {};
-        if (v.turn_off) beforeConfig.turn_off = v.turn_off;
-        if (v.unjoin) beforeConfig.unjoin = v.unjoin;
-        if (v.joinLeader && (v.joinMembers || []).length) {
-          beforeConfig.join = { leader: v.joinLeader, members: v.joinMembers };
+        else delete zoneConfig.icon;
+        for (const key of ['volume_max', 'volume_start', 'volume_step']) {
+          if (v[key] != null && v[key] !== '') zoneConfig[key] = v[key];
+          else delete zoneConfig[key];
         }
+        const groupWith = [].concat(v.group_with || []).filter((id) => id && id !== v.entity);
+        if (groupWith.length) zoneConfig.group_with = groupWith;
+        else delete zoneConfig.group_with;
+        if (v.solo) zoneConfig.solo = true;
+        else delete zoneConfig.solo;
+        const beforeConfig = Object.assign({}, currentZone.before || {});
+        if (v.turn_off) beforeConfig.turn_off = v.turn_off;
+        else delete beforeConfig.turn_off;
+        if (beforeConfig.join && beforeConfig.join.leader === currentZone.entity) delete beforeConfig.join;
+        if (beforeConfig.unjoin === currentZone.entity) delete beforeConfig.unjoin;
         if (Object.keys(beforeConfig).length) zoneConfig.before = beforeConfig;
+        else delete zoneConfig.before;
         this._cfg.zones = (this._cfg.zones || []).slice();
         this._cfg.zones[i] = zoneConfig;
         this._emitConfigChange();
@@ -336,6 +347,14 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
             this._rebuildEditor();
           }));
         }
+      }
+      if (z.volume) {
+        const volumeState = this._hass && this._hass.states[z.volume];
+        const volumeName = (volumeState && volumeState.attributes && volumeState.attributes.friendly_name) || z.volume;
+        const alert = document.createElement('ha-alert');
+        alert.setAttribute('alert-type', 'info');
+        alert.textContent = editorText.volumeLegacy.replace('{name}', volumeName);
+        content.appendChild(alert);
       }
       content.appendChild(form);
       zoneSection.appendChild(this._addPanel(z.name || editorText.naamloos, content, () => {

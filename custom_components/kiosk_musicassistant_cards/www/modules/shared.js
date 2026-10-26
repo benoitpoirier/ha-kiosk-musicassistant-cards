@@ -181,8 +181,10 @@ export const TAAL = {
       username: 'Music Assistant user',
       usernameHint: 'Username of a Music Assistant user whose provider filter selects the account to use.',
       connect_entity: 'Spotify Connect player',
-      turn_off: 'First switch off (optional)', unjoin: 'First detach (optional)',
-      joinLeader: 'First group onto (optional)', joinMembers: 'these speakers',
+      turn_off: 'First switch off this Music Assistant player (optional)',
+      group_with: 'Group with (Music Assistant players)', solo: 'Play alone (detach it from any group)',
+      volumeLegacy: 'Volume is sent to {name} (YAML option volume). Prefer the volume control setting of this player in Music Assistant (Settings > Players).',
+      geen: 'None',
       uri: 'Media id', image: 'Cover image URL (optional)',
       uriHint: 'A Music Assistant media id, for example library://playlist/65. '
         + 'Developer tools > Actions > "Music Assistant: Search" returns the id of '
@@ -298,8 +300,10 @@ export const TAAL = {
       username: 'Music Assistant-gebruiker',
       usernameHint: 'Gebruikersnaam van een Music Assistant-gebruiker waarvan het bronfilter het account bepaalt.',
       connect_entity: 'Spotify Connect-speler',
-      turn_off: 'Eerst uitzetten (optioneel)', unjoin: 'Eerst loskoppelen (optioneel)',
-      joinLeader: 'Eerst groeperen op (optioneel)', joinMembers: 'met deze speakers',
+      turn_off: 'Eerst deze Music Assistant-speler uitschakelen (optioneel)',
+      group_with: 'Groeperen met (Music Assistant-spelers)', solo: 'Alleen spelen (uit elke groep halen)',
+      volumeLegacy: 'Volume gaat naar {name} (YAML-optie volume). Gebruik liever de volumeregeling van deze speler in Music Assistant (Instellingen > Spelers).',
+      geen: 'Geen',
       uri: 'Media-id', image: 'Afbeelding-URL (optioneel)',
       uriHint: 'Een Music Assistant media-id, bijvoorbeeld library://playlist/65. '
         + 'Ontwikkelhulpmiddelen > Acties > "Music Assistant: Search" geeft het id '
@@ -419,8 +423,10 @@ export const TAAL = {
       username: 'Utilisateur Music Assistant',
       usernameHint: 'Nom d’utilisateur MA dont le filtre fournisseur sélectionne le compte à utiliser.',
       connect_entity: 'Lecteur Spotify Connect',
-      turn_off: 'Éteindre d’abord (facultatif)', unjoin: 'Dissocier d’abord (facultatif)',
-      joinLeader: 'Regrouper d’abord avec (facultatif)', joinMembers: 'ces lecteurs',
+      turn_off: 'Éteindre d’abord ce lecteur Music Assistant (facultatif)',
+      group_with: 'Grouper avec (lecteurs Music Assistant)', solo: 'Jouer seul (le détacher de tout groupe)',
+      volumeLegacy: 'Le volume est envoyé à {name} (option YAML volume). Préférez le réglage de contrôle du volume de ce lecteur dans Music Assistant (Paramètres > Lecteurs).',
+      geen: 'Aucun',
       uri: 'Identifiant média', image: 'URL de la pochette (facultatif)',
       uriHint: 'Identifiant Music Assistant, par exemple library://playlist/65. Outils de développement > Actions > Music Assistant : Rechercher renvoie cet identifiant.',
       play: 'Lire immédiatement', radio: 'Mode radio',

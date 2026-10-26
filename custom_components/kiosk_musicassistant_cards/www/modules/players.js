@@ -60,13 +60,62 @@ export const suggestMaPlayer = (hass, entityId) => {
   return partial.length === 1 ? partial[0].entity : null;
 };
 
+// Players configured on a card. Both cards accept `zones` (browser) and
+// `players` (now-playing) with the same `{ entity, name, icon, ... }` items.
+export const configuredPlayers = (cfg) => {
+  const c = cfg || {};
+  if (Array.isArray(c.zones) && c.zones.length) return c.zones;
+  return Array.isArray(c.players) ? c.players : [];
+};
+
+// Home Assistant gives a synced member the group_members of its leader, leader
+// first. Returns the leader entity for a member, null for a leader or a solo player.
+export const groupLeader = (state) => {
+  const members = (state && state.attributes && state.attributes.group_members) || [];
+  return members.length > 1 && members[0] !== state.entity_id ? members[0] : null;
+};
+
+// Drop the members whose leader is in the same list: the leader already shows
+// the music they play.
+export const dropFollowers = (hass, players) => {
+  const ids = new Set((players || []).map((p) => p && p.entity));
+  return (players || []).filter((p) => !ids.has(groupLeader(hass && hass.states[p && p.entity])));
+};
+
+// Group a zone as configured before playing, using Music Assistant groups:
+// `group_with` joins the missing players to the zone player; `solo` detaches
+// it from any group. Returns true when something changed.
+export const applyZoneGroup = async (hass, zone) => {
+  const state = zone && hass && hass.states[zone.entity];
+  if (!state) return false;
+  const members = (state.attributes && state.attributes.group_members) || [];
+  const call = (service, data, entityId) => hass.callService('media_player', service, data, { entity_id: entityId })
+    .catch(() => {});
+  const wanted = [].concat(zone.group_with || []).filter((id) => id && id !== zone.entity);
+  if (wanted.length) {
+    const missing = wanted.filter((id) => !members.includes(id));
+    if (!missing.length) return false;
+    await call('join', { group_members: missing }, zone.entity);
+    return true;
+  }
+  if (zone.solo && members.length > 1) {
+    if (groupLeader(state)) await call('unjoin', {}, zone.entity);
+    else for (const id of members) if (id !== zone.entity) await call('unjoin', {}, id);
+    return true;
+  }
+  return false;
+};
+
 // The player that actually owns the music for `selected`: the player itself
-// when it plays, otherwise a playing Music Assistant group among `candidates`
-// that shares its queue or contains it, so commands do not hit an empty queue.
+// when it plays, else the leader it is synced to, else a playing Music
+// Assistant group among `candidates` that shares its queue or contains it, so
+// commands do not hit an empty queue.
 export const findActivePlayer = (hass, selected, candidates) => {
   const states = (hass && hass.states) || {};
   const s = states[selected];
   if (!selected || (s && PLAYING_STATES.includes(s.state))) return selected;
+  const leader = groupLeader(s);
+  if (leader && states[leader] && PLAYING_STATES.includes(states[leader].state)) return leader;
   const queue = s && s.attributes ? s.attributes.active_queue : null;
   let groupPlayer = null;
   for (const id of candidates || []) {

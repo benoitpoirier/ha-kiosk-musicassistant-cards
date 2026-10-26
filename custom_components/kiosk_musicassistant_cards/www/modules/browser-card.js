@@ -4,7 +4,7 @@ const {
   normalizeSpotifyUri, autofillSimilar, PLAYING_STATES, safeImageUrl, VOLUME_CSS, defaultCategories, esc, formatDuration, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay,
 } = await import(`./shared.js${Q}`);
 const { KIOSK_CSS, KIOSK_THEMES } = await import(`./kiosk-theme.js${Q}`);
-const { listMaPlayers, findActivePlayer } = await import(`./players.js${Q}`);
+const { listMaPlayers, findActivePlayer, applyZoneGroup, configuredPlayers } = await import(`./players.js${Q}`);
 
 const DOMAIN = 'kiosk_musicassistant_cards';
 const PLAYBACK_TIMEOUT_S = 60;
@@ -723,7 +723,8 @@ export class MusicAssistantTouchCard extends HTMLElement {
 
   // Use configured zones, or discover all Music Assistant players automatically.
   _getZones() {
-    if (this._cfg.zones && this._cfg.zones.length) return this._cfg.zones;
+    const configured = configuredPlayers(this._cfg);
+    if (configured.length) return configured;
     if (this._zones) return this._zones;
     const players = listMaPlayers(this._hass).map((p) => ({
       name: p.name, entity: p.entity, icon: p.type === 'group' ? 'groep' : 'speaker',
@@ -1032,8 +1033,8 @@ export class MusicAssistantTouchCard extends HTMLElement {
   // member queues when a group is turned off, leaving transfer_queue no source.
   // Defer such shutdowns in `deferredShutdowns` until after the transfer.
   async _preparePlayer(exceptEntity, deferredShutdowns) {
-    const b = this._getZoneConfig().before;
-    if (!b) return;
+    const zone = this._getZoneConfig();
+    const b = zone.before || {};
     let changed = false;
     if (b.turn_off && b.turn_off !== exceptEntity) {
       const playerState = this._getState(b.turn_off);
@@ -1067,6 +1068,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
         changed = true;
       }
     }
+    if (await applyZoneGroup(this._hass, zone)) changed = true;
     if (changed) await new Promise((r) => setTimeout(r, 350));
   }
 
