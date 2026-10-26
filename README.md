@@ -297,6 +297,113 @@ actions:
       entity_id: switch.kiosk_music_assistant_cards_hide_player_buttons
 ```
 
+## Example: wall kiosk with Kiosk Satellite
+
+This setup runs on an Echo Show 8 with the *Kiosk Satellite* app. A `dashboard-kiosk` dashboard uses panel views: `menu` (home), `lecture` (now-playing card) and `music-browser` (browser card). Four automations turn the tablet into a music display:
+
+- while music plays, the screensaver shows the now-playing view instead of the weather, without dimming;
+- when the music stops, the weather screensaver and dimming come back;
+- when the screen wakes up, it opens the now-playing view if music is playing, otherwise the menu;
+- while the screensaver is on, the player buttons are hidden, leaving a large cover and title readable from across the room.
+
+Replace `echo_show_8` with the name of your Kiosk Satellite device, and the `media_player` entities with your Music Assistant players. In Kiosk Satellite, set the *Home Assistant Dashboard* screensaver to the `dashboard-kiosk/lecture` view.
+
+```yaml
+- id: kiosk_music_start
+  alias: Kiosk - music starts, now-playing screensaver
+  triggers:
+    - trigger: state
+      entity_id: &kiosk_players
+        - media_player.echo_show_8_2
+        - media_player.denon_avr_x3500h_3
+      to: [playing, buffering]
+  actions:
+    - action: select.select_option
+      target:
+        entity_id: select.echo_show_8_screensaver_mode
+      data:
+        option: Home Assistant Dashboard
+    - action: switch.turn_off
+      target:
+        entity_id: switch.echo_show_8_screensaver_brightness
+  mode: restart
+
+- id: kiosk_music_end
+  alias: Kiosk - music stops, weather screensaver
+  triggers:
+    - trigger: state
+      entity_id: *kiosk_players
+      to: [paused, idle, "off", standby]
+      from: null  # state changes only, not attribute updates
+  conditions:
+    - condition: not
+      conditions:
+        - condition: state
+          entity_id: *kiosk_players
+          state: playing
+          match: any
+  actions:
+    - action: select.select_option
+      target:
+        entity_id: select.echo_show_8_screensaver_mode
+      data:
+        option: Weather Mood
+    - action: switch.turn_on
+      target:
+        entity_id: switch.echo_show_8_screensaver_brightness
+  mode: restart
+
+- id: kiosk_wake_view
+  alias: Kiosk - dashboard view around the screensaver
+  triggers:
+    - trigger: state
+      entity_id: switch.echo_show_8_screensaver_active
+      from: "off"
+      to: "on"
+      id: start
+    - trigger: state
+      entity_id: switch.echo_show_8_screensaver_active
+      from: "on"
+      to: "off"
+      id: stop
+  actions:
+    - variables:
+        target: >-
+          {{ 'dashboard-kiosk/lecture'
+             if is_state('media_player.echo_show_8_2', 'playing')
+             or is_state('media_player.denon_avr_x3500h_3', 'playing')
+             else 'dashboard-kiosk/menu' }}
+    # On start, only prepare the now-playing view behind the screensaver.
+    - condition: template
+      value_template: "{{ trigger.id == 'stop' or target == 'dashboard-kiosk/lecture' }}"
+    # Avoid reloading a view that is already shown.
+    - condition: template
+      value_template: "{{ not states('sensor.echo_show_8_current_page').endswith('/' ~ target) }}"
+    - action: select.select_option
+      target:
+        entity_id: select.echo_show_8_dashboard_view
+      data:
+        option: "{{ target }}"
+  mode: restart
+
+- id: kiosk_hide_controls
+  alias: Kiosk - hide player buttons during screensaver
+  triggers:
+    - trigger: state
+      entity_id: switch.echo_show_8_screensaver_active
+      to: ["on", "off"]
+    - trigger: homeassistant
+      event: start
+  actions:
+    - action: >-
+        switch.turn_{{ 'on' if is_state('switch.echo_show_8_screensaver_active', 'on') else 'off' }}
+      target:
+        entity_id: switch.kiosk_music_assistant_cards_hide_player_buttons
+  mode: restart
+```
+
+Kiosk Satellite keeps control of when the screensaver starts (its inactivity timeout): the automations only choose what it shows and never force it on.
+
 ## Actions
 
 All actions return a response (`return_response: true`).
