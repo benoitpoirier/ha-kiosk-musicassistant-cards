@@ -41,6 +41,10 @@
           "name": "Music Assistant",
           "description": "The Music Assistant config entry to query."
         },
+        "username": {
+          "name": "Music Assistant user",
+          "description": "Optional Music Assistant username to fetch the top picks for."
+        },
         "limit": {
           "name": "Limit",
           "description": "Maximum number of items to return."

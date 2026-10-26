@@ -1,5 +1,5 @@
 const Q = new URL(import.meta.url).search;
-const { safeImageUrl, VOLUME_CSS, esc, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay, autofillSimilar } = await import(`./shared.js${Q}`);
+const { safeImageUrl, VOLUME_CSS, esc, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay, autofillSimilar, getSharedSource } = await import(`./shared.js${Q}`);
 const { THEME_COLORS } = await import(`./kiosk-theme.js${Q}`);
 const { listMaPlayers, isMaPlayer, maPlayerOptions, configuredPlayers, dropFollowers, loadDeviceInfo, suggestMaPlayer } = await import(`./players.js${Q}`);
 
@@ -374,6 +374,7 @@ export class KioskNowPlayingCard extends HTMLElement {
         ] },
         { type: 'expandable', name: '', title: labels.advanced, schema: [
           { name: 'username', selector: { text: {} } },
+          bool('follow_source'),
           { name: 'autofill_similar', selector: { boolean: {} }, default: true },
           { name: 'volume_step', selector: { number: { min: 1, max: 20, step: 1, mode: 'box' } } },
         ] },
@@ -403,6 +404,11 @@ export class KioskNowPlayingCard extends HTMLElement {
     return found;
   }
 
+  _getEffectiveUsername() {
+    if (this._cfg.username) return this._cfg.username;
+    return this._cfg.follow_source === false ? undefined : getSharedSource(this._cfg.config_entry_id);
+  }
+
   _getTranslations() {
     const lang = getLanguage(this._cfg.language, this._hass && this._hass.language);
     return Object.assign({}, lang.np, {
@@ -416,6 +422,21 @@ export class KioskNowPlayingCard extends HTMLElement {
   }
 
   connectedCallback() {
+    if (!this._sourceListener) {
+      this._sourceListener = (event) => {
+        const detail = event.detail || {};
+        if (detail.config_entry_id !== this._cfg.config_entry_id || this._cfg.username
+          || this._cfg.follow_source === false) return;
+        const username = detail.username || getSharedSource(this._cfg.config_entry_id);
+        if (username !== this._effectiveUsername) {
+          this._effectiveUsername = username;
+          this._autofillKey = null;
+          this._sync();
+        }
+      };
+      window.addEventListener('kiosk-musicassistant-source', this._sourceListener);
+    }
+    this._effectiveUsername = this._getEffectiveUsername();
     this._startProgressTimer();
     if (this._auto && !this._resizeListener && this.shadowRoot.firstChild) {
       this._resizeListener = () => this._fillHeight();
@@ -623,7 +644,10 @@ export class KioskNowPlayingCard extends HTMLElement {
         if (shell._sizes[key] !== size) { shell._sizes[key] = size; shell.style.setProperty(`--np-${key}`, `${size}px`); }
       }
     }
-    if (this._cfg.autofill_similar !== false) autofillSimilar(this, this._hass, entity, this._cfg.username);
+    if (this._cfg.autofill_similar !== false) {
+      this._effectiveUsername = this._getEffectiveUsername();
+      autofillSimilar(this, this._hass, entity, this._effectiveUsername);
+    }
     const state = this._state(entity);
     const attributes = (state && state.attributes) || {};
     const queueContextKey = attributes.active_queue
@@ -1215,6 +1239,10 @@ export class KioskNowPlayingCard extends HTMLElement {
   }
 
   disconnectedCallback() {
+    if (this._sourceListener) {
+      window.removeEventListener('kiosk-musicassistant-source', this._sourceListener);
+      this._sourceListener = null;
+    }
     clearInterval(this._timer);
     this._timer = null;
     if (this._resizeListener) {

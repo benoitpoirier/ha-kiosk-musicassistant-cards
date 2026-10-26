@@ -15,6 +15,18 @@ export const esc = (s) => String(s == null ? '' : s)
 
 export const PLAYING_STATES = ['playing', 'paused', 'buffering'];
 
+export function sharedSourceStorageKey(configEntryId) {
+  const path = typeof location !== 'undefined' ? location.pathname : '';
+  const dashboard = path.split('/').filter(Boolean)[0] || '';
+  return `kiosk_musicassistant_cards:source:${configEntryId}:${dashboard}`;
+}
+
+export function getSharedSource(configEntryId) {
+  if (!configEntryId) return undefined;
+  try { return window.localStorage.getItem(sharedSourceStorageKey(configEntryId)) || undefined; }
+  catch (error) { return undefined; }
+}
+
 // Ask the integration to queue similar tracks once per playing track; it checks the live queue.
 export const AUTOFILL_DELAY = 5000;
 
@@ -149,6 +161,7 @@ export const TAAL = {
       title_size: 'Title (px)', artist_size: 'Artist / band (px)', album_size: 'Album (px)',
       title_size_no_buttons: 'Title (px)', artist_size_no_buttons: 'Artist / band (px)', album_size_no_buttons: 'Album (px)',
       username: 'Music Assistant user',
+      follow_source: 'Follow browser card source', follow_source_help: 'When no user is specified, use the source (Benoît, Sandrine…) selected in the browser card on the same dashboard.',
       username_help: 'Optional. Music Assistant user whose history and favourites seed the similar tracks.',
       players: 'Players', players_help: 'Music Assistant players only, one per device (empty = all of them). Music Assistant picks the protocol itself.',
       nietMa: 'Not a Music Assistant player, the card cannot play on it:', gebruikMa: 'Use {name}', groep: 'group',
@@ -235,7 +248,7 @@ export const TAAL = {
     luister: 'Afspelen', opnieuw: 'Vernieuwen', spelerTonen: 'Speler tonen', spelerVerbergen: 'Speler verbergen', voorJou: 'Aanbevolen voor jou', zoektVoorJou: 'Nieuwe muziek zoeken…', omdat: 'Omdat je {x} luistert',
     type1: { track: 'Nummer', album: 'Album', artist: 'Artiest', playlist: 'Playlist', radio: 'Radio', podcast: 'Podcast', audiobook: 'Luisterboek' },
     rijNamen: {
-      'recently played': 'Onlangs gespeeld', 'recently added albums': 'Onlangs toegevoegde albums',
+      'recently played': 'Onlangs gespeeld', 'your favourites': 'Jouw favorieten', 'recently added albums': 'Onlangs toegevoegde albums',
       'recently added tracks': 'Onlangs toegevoegde nummers', 'recently added': 'Onlangs toegevoegd',
       'random artists': 'Willekeurige artiesten', 'random albums': 'Willekeurige albums',
       'random tracks': 'Willekeurige nummers', 'favorite tracks': 'Favoriete nummers',
@@ -268,6 +281,7 @@ export const TAAL = {
       title_size: 'Titel (px)', artist_size: 'Artiest / groep (px)', album_size: 'Album (px)',
       title_size_no_buttons: 'Titel (px)', artist_size_no_buttons: 'Artiest / groep (px)', album_size_no_buttons: 'Album (px)',
       username: 'Music Assistant-gebruiker',
+      follow_source: 'Bron van browserkaart volgen', follow_source_help: 'Gebruik zonder opgegeven gebruiker de bron (Benoît, Sandrine…) die in de browserkaart op hetzelfde dashboard is gekozen.',
       username_help: 'Optioneel. Music Assistant-gebruiker wiens geschiedenis en favorieten de vergelijkbare nummers bepalen.',
       players: 'Spelers', players_help: 'Alleen Music Assistant-spelers, een per apparaat (leeg = allemaal). Music Assistant kiest zelf het protocol.',
       nietMa: 'Geen Music Assistant-speler, de kaart kan er niet op afspelen:', gebruikMa: '{name} gebruiken', groep: 'groep',
@@ -355,7 +369,7 @@ export const TAAL = {
     luister: 'Écouter', opnieuw: 'Actualiser', spelerTonen: 'Afficher le lecteur', spelerVerbergen: 'Masquer le lecteur', voorJou: 'Recommandé pour vous', zoektVoorJou: 'Recherche de nouveautés pour vous…', omdat: 'Parce que vous écoutez {x}',
     type1: { track: 'Titre', album: 'Album', artist: 'Artiste', playlist: 'Playlist', radio: 'Radio', podcast: 'Podcast', audiobook: 'Livre audio' },
     rijNamen: {
-      'recently played': 'Écoutés récemment', 'recently added albums': 'Albums ajoutés récemment',
+      'recently played': 'Écoutés récemment', 'your favourites': 'Vos favoris', 'recently added albums': 'Albums ajoutés récemment',
       'recently added tracks': 'Titres ajoutés récemment', 'recently added': 'Ajoutés récemment',
       'random artists': 'Artistes au hasard', 'random albums': 'Albums au hasard',
       'random tracks': 'Titres au hasard', 'favorite tracks': 'Titres favoris',
@@ -390,6 +404,7 @@ export const TAAL = {
       title_size: 'Titre (px)', artist_size: 'Groupe / artiste (px)', album_size: 'Album (px)',
       title_size_no_buttons: 'Titre (px)', artist_size_no_buttons: 'Groupe / artiste (px)', album_size_no_buttons: 'Album (px)',
       username: 'Utilisateur Music Assistant',
+      follow_source: 'Suivre la source de la carte navigateur', follow_source_help: 'Sans utilisateur indiqué, utilise la source (Benoît, Sandrine…) choisie dans la carte navigateur du même dashboard.',
       username_help: 'Facultatif. Utilisateur Music Assistant dont l’historique et les favoris servent de base aux titres similaires.',
       players: 'Lecteurs', players_help: 'Lecteurs Music Assistant uniquement, un par appareil (vide = tous). Music Assistant choisit lui-même le protocole.',
       nietMa: 'Pas un lecteur Music Assistant, la carte ne peut pas y jouer :', gebruikMa: 'Utiliser {name}', groep: 'groupe',

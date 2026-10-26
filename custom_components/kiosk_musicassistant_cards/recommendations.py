@@ -15,6 +15,7 @@ from homeassistant.components.music_assistant.schemas import media_item_dict_fro
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.storage import Store
 from music_assistant_models.media_items import media_from_dict
 
 _LOGGER = logging.getLogger(__name__)
@@ -54,11 +55,38 @@ SIMILAR_TIMEOUT = 15
 CACHE_TTL = 30 * 60
 KEEP_WARM = 24 * 3600
 DATA_CACHE = "kiosk_musicassistant_cards_recommendations"
+DATA_STORE = "kiosk_musicassistant_cards_recommendations_store"
+STORE_VERSION = 1
+STORE_SAVE_DELAY = 60
+
+# Music Assistant builds these rows from one play log shared by every user
+# (verified on MA 2.10: identical for two users while their own library
+# listings differ). With a username they are replaced by rows read from the
+# library in that user's context, where last_played and play_count are theirs.
+PLAYLOG_ROWS = {
+    "recently played", "recent artists", "recent tracks", "recent albums",
+    "forgotten tracks", "forgotten albums", "forgotten artists",
+    "most played tracks", "never / rarely played",
+}
+# (translation key, English name, icon, media type, library query, filter field)
+USER_ROWS = [
+    ("user_recent_tracks", "Recently played", "mdi-history", "tracks",
+     {"order_by": "last_played_desc"}, "last_played"),
+    ("user_recent_albums", "Recent albums", "mdi-album", "albums",
+     {"order_by": "last_played_desc"}, "last_played"),
+    ("user_recent_artists", "Recent artists", "mdi-account-music", "artists",
+     {"order_by": "last_played_desc"}, "last_played"),
+    ("user_most_played", "Most played tracks", "mdi-trophy", "tracks",
+     {"order_by": "play_count_desc"}, "play_count"),
+    ("user_favorites", "Your favourites", "mdi-heart", "tracks",
+     {"favorite": True, "order_by": "random"}, None),
+]
 DOMAIN = "kiosk_musicassistant_cards"
 
 GET_TOP_PICKS_SCHEMA = vol.Schema(
     {
         vol.Required("config_entry_id"): cv.string,
+        vol.Optional("username"): cv.string,
         vol.Optional("limit", default=TOP_PICKS_LIMIT): vol.All(
             cv.positive_int, vol.Range(min=1, max=MAX_TOP_PICKS_LIMIT)
         ),
@@ -162,16 +190,22 @@ async def async_get_top_picks(call: ServiceCall) -> dict[str, list[dict[str, Any
     """Return the native feed in the user context of HA's authenticated MA client."""
     mass = get_music_assistant_client(call.hass, call.data["config_entry_id"])
     limit = call.data["limit"]
+    user = call.data.get("username")
     rows = await _async_fetch_rows(mass, None, False)
+    serialized: list[list[dict[str, Any]]] = []
+    if user:
+        serialized = [row["items"] for row in await _async_user_rows(mass, user, limit)]
+        rows = [(folder, row) for folder, row in rows if not _is_playlog_row(folder)]
+    serialized += [[_serialize_item(mass, raw, folder["name"]) for raw in row] for folder, row in rows]
 
     items: list[dict[str, Any]] = []
     seen_uris: set[str] = set()
-    max_row_length = max((len(row) for _, row in rows), default=0)
+    max_row_length = max((len(row) for row in serialized), default=0)
     for index in range(max_row_length):
-        for folder, row in rows:
+        for row in serialized:
             if index >= len(row):
                 continue
-            item = _serialize_item(mass, row[index], folder["name"])
+            item = row[index]
             if item["uri"] in seen_uris:
                 continue
             seen_uris.add(item["uri"])
@@ -179,7 +213,8 @@ async def async_get_top_picks(call: ServiceCall) -> dict[str, list[dict[str, Any
             if len(items) == limit:
                 return {"items": items}
 
-    if len(items) < limit:
+    # The global recently played list would bring another user's history back.
+    if len(items) < limit and not user:
         recently_played = await mass.send_command(
             "music/recently_played_items",
             limit=RECENTLY_PLAYED_LIMIT,
@@ -215,6 +250,9 @@ async def _async_ma_rows(
         rows = await _async_fetch_rows(mass, None, include_hidden)
 
     result: list[dict[str, Any]] = []
+    if user:
+        result = await _async_user_rows(mass, user, row_limit)
+        rows = [(folder, raw_items) for folder, raw_items in rows if not _is_playlog_row(folder)]
     for folder, raw_items in rows:
         items: list[dict[str, Any]] = []
         seen_uris: set[str] = set()
@@ -240,6 +278,51 @@ async def _async_ma_rows(
             }
         )
     return result
+
+
+def _is_playlog_row(folder: dict[str, Any]) -> bool:
+    keys = {str(folder.get("name") or "").lower(), str(folder.get("translation_key") or "").replace("_", " ").lower()}
+    return bool(keys & PLAYLOG_ROWS)
+
+
+async def _async_user_rows(mass: Any, user: str, row_limit: int) -> list[dict[str, Any]]:
+    """Rows from the library as seen by one Music Assistant user (their own play log)."""
+
+    async def fetch(media: str, query: dict[str, Any], field: str | None) -> list[dict[str, Any]]:
+        try:
+            raw_items = await _send(
+                mass, f"music/{media}/library_items", user, limit=row_limit * 2, **query
+            )
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Library %s for %s failed: %s", media, user, err)
+            return []
+        items: list[dict[str, Any]] = []
+        for raw in raw_items if isinstance(raw_items, list) else []:
+            # Without a play by this user the sort falls back to library order.
+            if field and isinstance(raw, dict) and field in raw and not raw[field]:
+                continue
+            try:
+                items.append(_serialize_item(mass, raw, field or "favorite"))
+            except HomeAssistantError:
+                continue
+            if len(items) == row_limit:
+                break
+        return items
+
+    answers = await asyncio.gather(*(fetch(media, query, field) for _, _, _, media, query, field in USER_ROWS))
+    return [
+        {
+            "id": f"user/{key}",
+            "name": name,
+            "translation_key": key,
+            "subtitle": None,
+            "icon": icon,
+            "source": SOURCE_MUSIC_ASSISTANT,
+            "items": items,
+        }
+        for (key, name, icon, _, _, _), items in zip(USER_ROWS, answers)
+        if items
+    ]
 
 
 def _seed_from_uri(uri: str, name: str, artist: str | None) -> dict[str, Any] | None:
@@ -472,6 +555,8 @@ def _schedule(hass: HomeAssistant, key: tuple, params: dict[str, Any]) -> asynci
         if rows or entry["rows"] is None:
             entry["rows"] = rows
         entry["time"] = time.monotonic()
+        entry["wall"] = time.time()
+        _async_schedule_save(hass)
         return entry["rows"]
 
     entry["task"] = hass.async_create_background_task(build(), f"{DOMAIN} recommendations")
@@ -504,3 +589,49 @@ def async_keep_warm(hass: HomeAssistant) -> None:
             store.pop(key, None)
         elif now - entry["time"] > CACHE_TTL * 0.8:
             _schedule(hass, key, entry["params"])
+
+
+# ---------- persistence ----------
+# The similar-track feeds survive a restart, so the first Discover after it
+# (and the first switch to another music source) is served at once while a
+# rebuild runs in the background.
+
+def _async_schedule_save(hass: HomeAssistant) -> None:
+    store: Store | None = hass.data.get(DATA_STORE)
+    if store is None:
+        return
+
+    def data() -> dict[str, Any]:
+        return {
+            "feeds": [
+                {"params": entry["params"], "rows": entry["rows"], "wall": entry.get("wall", 0)}
+                for entry in _store(hass).values()
+                if entry["rows"]
+            ]
+        }
+
+    store.async_delay_save(data, STORE_SAVE_DELAY)
+
+
+async def async_load_cache(hass: HomeAssistant) -> None:
+    """Restore the similar-track feeds saved before the last restart."""
+    store: Store = Store(hass, STORE_VERSION, f"{DOMAIN}.recommendations")
+    hass.data[DATA_STORE] = store
+    try:
+        saved = await store.async_load() or {}
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.debug("Could not load the saved recommendations: %s", err)
+        return
+    now, wall = time.monotonic(), time.time()
+    for feed in saved.get("feeds") or []:
+        age = wall - float(feed.get("wall") or 0)
+        params = feed.get("params")
+        if not isinstance(params, dict) or not feed.get("rows") or not 0 <= age < KEEP_WARM:
+            continue
+        key = tuple(sorted(params.items()))
+        _store(hass).setdefault(
+            key,
+            # Marked as used now: the keep-warm timer refreshes it during the next day.
+            {"rows": feed["rows"], "time": now - age, "wall": feed["wall"], "used": now,
+             "task": None, "params": params},
+        )

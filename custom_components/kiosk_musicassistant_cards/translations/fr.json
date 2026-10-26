@@ -41,6 +41,10 @@
           "name": "Music Assistant",
           "description": "L’entrée de configuration Music Assistant à interroger."
         },
+        "username": {
+          "name": "Utilisateur Music Assistant",
+          "description": "Nom d’utilisateur Music Assistant facultatif pour lequel obtenir les meilleures sélections."
+        },
         "limit": {
           "name": "Limite",
           "description": "Nombre maximal d’éléments retournés."

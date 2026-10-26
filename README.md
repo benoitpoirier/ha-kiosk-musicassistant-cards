@@ -40,7 +40,7 @@ Now playing card (1280×800 kiosk):
 | Card | Type | Description |
 | --- | --- | --- |
 | Browser | `custom:kiosk-musicassistant-card` | Player, speaker switching, a *Discover* tab with new tracks recommended from your listening history (and Music Assistant rows), library categories, search with on-screen keyboard and navigation buttons in a single card. Visual editor included. |
-| Now playing | `custom:kiosk-musicassistant-now-playing` | Full-screen now-playing view: cover art, progress, transport, volume, queue preview, synchronised lyrics and optional Spotify favourites. YAML configuration. |
+| Now playing | `custom:kiosk-musicassistant-now-playing` | Full-screen now-playing view: cover art, progress, transport, volume, queue preview, synchronised lyrics and optional Spotify favourites. Visual editor included. |
 
 Interface languages: English, French and Dutch (follows Home Assistant, or set `language`).
 
@@ -48,13 +48,13 @@ Both cards are responsive and tuned for a 1280×800 kiosk (Echo Show 8 class): t
 
 ## What's new
 
-- **Mobile portrait layout**: on a narrow screen (card width up to 480 px) the browser card stacks the player (artwork beside the title, full-width progress and controls) above the browser, and the now-playing card uses tighter sizes. The landscape layout is unchanged.
-- **Light playback modal**: while a track starts, a compact floating pill with an animated equalizer and a short sentence replaces the step-by-step dialog. It never blocks touch input. The detailed modal is still available with `full_modal: true`.
-- **Similar tracks after play** (`autofill_similar`, on by default): when the track that plays is the last one of the queue, 10 similar tracks are queued in the background (browser and now-playing cards), so the music never stops. Repeating queues and radio stations are left alone.
-- **Faster, more reliable playback tracking**: the progress follows the real player state (watchdog, no dependency on clock skew) and avoids heavy work on every Home Assistant state update.
-- **Volume buttons** of the browser card now match the main play button (round, theme gradient and glow).
-- **Cache-safe updates**: every module is loaded with the version in its URL, so a new version is never mixed with cached files from an older one.
-- Internal code identifiers and comments are now in English.
+See the [CHANGELOG](CHANGELOG.md) for the full history.
+
+- **Pick a speaker, not an entity** (1.8 – 1.9): the editors only list Music Assistant players, one per device. Music Assistant chooses the protocol (HEOS, AirPlay, DLNA…) itself, so the many Home Assistant entities of one device no longer matter. Wrong or stale entities are flagged with a one-click replacement, matched by name or by device model.
+- **Speaker groups from Music Assistant** (1.9): `group_with` and `solo` replace the old join/unjoin options; a player synced to a group is followed through its leader.
+- **Each person gets their own Discover feed** (1.10): Music Assistant's play-log rows are global, so for a music source they are replaced by rows from that user's library; Top Picks follow the user too.
+- **Instant source switching** (1.10): similar-track feeds survive restarts and the other sources are warmed in the background; the rows keep their place while recommendations load.
+- **One source for the whole dashboard** (1.10): the now-playing card follows the source picked in the browser card (`follow_source`).
 
 ## Requirements
 
@@ -210,7 +210,7 @@ Lets several people switch between their own accounts (for example one Spotify a
 | `connect_entity` | Optional Spotify `media_player` of this account. No longer used: switching source keeps the current playback running. |
 | `spotify_entity` | Optional [SpotifyPlus](https://github.com/thlucas1/homeassistantcomponent_spotifyplus) `media_player` of this account. Its Spotify listening history (top tracks of the last weeks, recently played) seeds the *Discover* recommendations. |
 
-The selected source is remembered per dashboard in the browser local storage.
+The selected source is remembered per dashboard in the browser local storage and shared with the now-playing card on that dashboard.
 
 ### `categories`
 
@@ -236,7 +236,9 @@ To find a media id: **Developer tools > Actions > Music Assistant: Search**, ena
 The *Discover* tab proposes music as horizontal carousels, with a featured pick on top:
 
 - **Similar tracks** (`discover_source: similar` or `mixed`): *Recommended for you* and *Because you listen to …* rows of new tracks. A handful of tracks from your listening history are picked as seeds and your music providers return similar tracks through Music Assistant (`music/tracks/similar_tracks`, the call behind Music Assistant's radio mode). This works with any provider that offers similar tracks (Spotify, Tidal, YouTube Music, Deezer…). The seeds are the tracks last played and the favourite tracks in Music Assistant; with a SpotifyPlus `spotify_entity`, your Spotify top tracks of the last weeks and recently played tracks are used instead, so the recommendations follow your whole Spotify history. The result is cached by the integration for 30 minutes and rebuilt in the background (feeds used in the last day are kept warm every 10 minutes), so the tab opens instantly; the refresh button forces a rebuild with other seeds. Spotify removed its recommendation endpoints from the public Web API in November 2024; Music Assistant's Spotify provider still reaches them with its own session.
-- **Music Assistant rows** (`music_assistant` or `mixed`): the rows of Music Assistant's home screen (recently played, recently added, random, forgotten, most played…).
+- **Music Assistant rows** (`music_assistant` or `mixed`): the rows of Music Assistant's home screen (recently played, recently added, random, forgotten, most played…). These play-log rows are global in Music Assistant; when a `music_sources` user is selected, they are replaced by rows from that user’s library: recently played tracks, albums and artists, most played tracks, and favourites.
+
+Similar-track feeds are persisted across Home Assistant restarts. Once the current Discover feed has loaded, the card also requests similar-track feeds for the other configured music sources in the background (at most once per user every 20 minutes), so switching source can show a warm cache immediately.
 
 Tapping a recommended track plays it and queues the rest of the row.
 
@@ -272,10 +274,11 @@ favorite_accounts:
 | `height` | `560` | Card height in pixels (420 to 780). `0` (or `auto`) = Auto: fill the remaining screen height below the card, e.g. a full-screen panel view on a kiosk. The legacy `fill: true` still works. |
 | `fill_margin` | `8` | Bottom margin in pixels in Auto height. |
 | `language` | HA language | `en`, `fr` or `nl`. |
-| `players` | all Music Assistant players | Players to follow. The visual editor now includes a Players field. The card shows the one that is playing (or the most recently paused). When several play at once, buttons let you choose. |
+| `players` | all Music Assistant players | Players to follow (same items as the browser card `zones`, which is also accepted). Only Music Assistant players are offered by the visual editor. The card shows the one that is playing (or the most recently paused). When several play at once, buttons let you choose. |
 | `volume_step` | `1` | Volume button step (%). The -/+ buttons repeat while held. |
 | `theme` | `sunset` | Accent colours, same names as the browser card `theme`. |
 | `autofill_similar` | `true` | When the track that plays is the last one of the queue, queue 10 similar tracks. |
+| `follow_source` | `true` | When no `username` is set, follow the Music Assistant source selected in the browser card on the same dashboard. |
 | `show_buttons` | `true` | `false` hides every button (player switch, favourite, queue, lyrics, transport, volume). |
 | `show_progress` | `true` | Show the progress bar. It stays visible when the buttons are hidden and moves to the bottom of the column, larger. |
 | `show_player` | `true` | Show the current player pill. |
@@ -431,10 +434,11 @@ action: kiosk_musicassistant_cards.get_top_picks
 data:
   config_entry_id: <your_music_assistant_config_entry_id>
   limit: 9
+  username: alice        # optional Music Assistant user
 response_variable: picks
 ```
 
-Returns `items`, each with `name`, `uri`, `image`, `media_type`, `artist` and `recommendation_reason`. Music Assistant recommendation rows are interleaved, then completed with recently played items.
+Returns `items`, each with `name`, `uri`, `image`, `media_type`, `artist` and `recommendation_reason`. Music Assistant recommendation rows are interleaved, then completed with recently played items. When `username` is set, Music Assistant's global play-log rows are replaced by that user's own rows (see `get_recommendations`) and the global recently played list is not used.
 
 ### `kiosk_musicassistant_cards.get_recommendations`
 
@@ -452,6 +456,8 @@ response_variable: discover
 ```
 
 Returns `rows`, each with `id`, `name`, `translation_key`, `subtitle`, `icon`, `source` (`similar` or `music_assistant`), `seed` (artist, for *because you listen to* rows) and `items` (same fields as above). Used by the *Discover* tab. When the Music Assistant server rejects the `username` argument, the feed of the account Home Assistant is connected with is returned instead.
+
+Music Assistant builds its play-log rows (recently played, recent tracks/artists, forgotten, most played, never/rarely played) from one log shared by all users. With a `username`, they are replaced by rows read from that user's library, where `last_played` and `play_count` are their own: `translation_key` `user_recent_tracks`, `user_recent_albums`, `user_recent_artists`, `user_most_played` and `user_favorites` (rows without items are left out). The other Music Assistant rows (recently added, random…) are kept. Similar-track feeds are cached per user and saved across restarts.
 
 ### `kiosk_musicassistant_cards.get_queue_items`
 

@@ -34,6 +34,7 @@ from .recommendations import (
     async_get_recommendations,
     async_get_top_picks,
     async_keep_warm,
+    async_load_cache,
 )
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -106,6 +107,8 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.services.async_register(
         DOMAIN, SERVICE_REMOVE_QUEUE_ITEM, async_remove_queue_item, schema=REMOVE_QUEUE_ITEM_SCHEMA
     )
+
+    await async_load_cache(hass)
 
     async def _keep_warm(_now) -> None:
         async_keep_warm(hass)

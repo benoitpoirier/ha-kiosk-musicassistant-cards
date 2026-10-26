@@ -2,6 +2,34 @@
 
 All notable changes to Kiosk Music Assistant Cards, newest first, grouped by minor version.
 
+## 1.10 (1.10.0, in progress)
+
+**Every person gets their own music**
+
+- **Discover rows follow the selected person.** Music Assistant keeps one play history for the whole house, so its "recently played", "most played" or "forgotten" rows were the same for everyone. With a music source selected, they are replaced by that person's own recently played tracks, albums and artists, most played tracks and favourites. *Benoît and Sandrine no longer see each other's history.*
+- **Top Picks follow the selected person too.**
+- **Switching person is instant.** The recommendations of the other people are prepared in the background, and they are kept across Home Assistant restarts. *No more 15-45 s wait after a restart or the first switch of the day.*
+- **No more jumping rows**: while new recommendations load, their place is kept at the top, so the rows below stay still.
+- **One person for the whole dashboard**: the Now Playing screen follows the person picked in the browser card (new `follow_source` option, on by default), so the similar songs it adds come from the right history.
+
+## 1.9 (1.9.0 to 1.9.1)
+
+**Speakers and groups handled by Music Assistant**
+
+- **Groups set up with Music Assistant players**: "Group with" and "Play alone" replace the old join and detach settings, which are converted automatically. *Kitchen alone or kitchen + veranda, in two taps in the editor.*
+- **Volume control left to Music Assistant**: the separate "volume goes to" setting is no longer offered (still honoured in YAML); set the volume control of the player in Music Assistant instead.
+- **A speaker synced to a group is followed through the group**, and the Now Playing screen no longer lists both a group and its members.
+- **Both cards share the same speaker list format** (`zones` or `players`).
+- **Stale speakers are fixed in one click**: when Music Assistant re-creates a player under a new name (e.g. "Denon ( MA)"), the editors recognise the same device by its model and offer the replacement, in the Now Playing editor too.
+
+## 1.8 (1.8.0)
+
+**Pick a speaker, not an entity**
+
+- **Only Music Assistant players are offered**, one per physical device. *A Denon seen through HEOS, AirPlay, DLNA and its own integration shows up once; Music Assistant picks the best protocol by itself.*
+- **Wrong entities are flagged** in the editors, with a one-click replacement by the matching Music Assistant player.
+- **New "Players" field** in the Now Playing editor.
+
 ## 1.7 (1.7.0 to 1.7.4)
 
 **Now Playing screen, easier to tailor**

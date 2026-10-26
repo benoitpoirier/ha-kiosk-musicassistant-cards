@@ -1,7 +1,7 @@
 const Q = new URL(import.meta.url).search;
 const {
   BIB_MAX, BIB_TTL, LARGE_IMAGE_URL, SMALL_IMAGE_URL, KEYBOARD_ROWS, MEDIA_TYPES, mediaTypeFromUri,
-  normalizeSpotifyUri, autofillSimilar, PLAYING_STATES, safeImageUrl, VOLUME_CSS, defaultCategories, esc, formatDuration, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay,
+  normalizeSpotifyUri, autofillSimilar, PLAYING_STATES, safeImageUrl, VOLUME_CSS, defaultCategories, esc, formatDuration, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay, getSharedSource, sharedSourceStorageKey,
 } = await import(`./shared.js${Q}`);
 const { KIOSK_CSS, KIOSK_THEMES } = await import(`./kiosk-theme.js${Q}`);
 const { listMaPlayers, findActivePlayer, applyZoneGroup, configuredPlayers } = await import(`./players.js${Q}`);
@@ -671,11 +671,39 @@ export class MusicAssistantTouchCard extends HTMLElement {
         if (this._discoverState === pendingState) this._showError(error);
       }).finally(() => {
         pendingState.pending.delete(part);
-        if (!pendingState.pending.size) pendingState.updatedAt = Date.now();
+        if (!pendingState.pending.size) {
+          pendingState.updatedAt = Date.now();
+          this._warmOtherSources(source, data.include_hidden);
+        }
         buildRows();
       });
     }));
   }
+  _warmOtherSources(discoverSource, includeHidden) {
+    if (!['similar', 'mixed'].includes(discoverSource)) return;
+    this._discoverWarmups = this._discoverWarmups || new Map();
+    const username = this._getCurrentUser() || '';
+    const lastWarmed = this._discoverWarmups.get(username) || 0;
+    if (Date.now() - lastWarmed < 20 * 60 * 1000) return;
+    this._discoverWarmups.set(username, Date.now());
+    this._sources.forEach((source, index) => {
+      if (index === this._sourceIndex) return;
+      const data = {
+        config_entry_id: this._cfg.config_entry_id,
+        row_limit: 20,
+        include_hidden: includeHidden,
+        source: 'similar',
+      };
+      if (source.username) data.username = source.username;
+      const spotify = source.spotify_entity || this._cfg.spotify_entity;
+      if (spotify) data.spotify_entity = spotify;
+      this._ws({
+        type: 'call_service', domain: DOMAIN, service: 'get_recommendations',
+        service_data: data, return_response: true,
+      }).catch(() => {});
+    });
+  }
+
   _getRowName(row) {
     const translations = this._getLanguage();
     if (row.translation_key === 'for_you') return translations.voorJou;
@@ -693,6 +721,10 @@ export class MusicAssistantTouchCard extends HTMLElement {
   }
 
   _sourceStorageKey() {
+    return sharedSourceStorageKey(this._cfg.config_entry_id);
+  }
+
+  _legacySourceStorageKey() {
     const path = typeof location !== 'undefined' ? location.pathname : '';
     return `${DOMAIN}:source:${this._cfg.config_entry_id}:${path}`;
   }
@@ -701,7 +733,8 @@ export class MusicAssistantTouchCard extends HTMLElement {
     this._sourceIndex = 0;
     if (!this._sources.length) return;
     try {
-      const stored = window.localStorage.getItem(this._sourceStorageKey());
+      const stored = getSharedSource(this._cfg.config_entry_id)
+        || window.localStorage.getItem(this._legacySourceStorageKey());
       const index = this._sources.findIndex((source) => source.username === stored);
       if (index >= 0) this._sourceIndex = index;
     } catch (error) { /* Kiosk browsers can disable local storage. */ }
@@ -713,6 +746,9 @@ export class MusicAssistantTouchCard extends HTMLElement {
     try {
       window.localStorage.setItem(this._sourceStorageKey(), source.username);
     } catch (error) { /* Kiosk browsers can disable local storage. */ }
+    window.dispatchEvent(new CustomEvent('kiosk-musicassistant-source', {
+      detail: { config_entry_id: this._cfg.config_entry_id, username: source.username },
+    }));
   }
 
   _getSourceConfig() { return this._sources[this._sourceIndex] || null; }
@@ -777,7 +813,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
         type: 'call_service',
         domain: DOMAIN,
         service: 'get_top_picks',
-        service_data: { config_entry_id: data.config_entry_id, limit: data.limit },
+        service_data: this._withUser({ config_entry_id: data.config_entry_id, limit: data.limit }, username),
         return_response: true,
       }).then((r) => {
         const items = r && r.response && r.response.items;
@@ -1919,7 +1955,10 @@ export class MusicAssistantTouchCard extends HTMLElement {
       ? `<span class="discover-icon">${svg('ontdek')}</span><div class="discover-title">${esc(title)}<small class="loading">${esc(t.zoektVoorJou)}</small></div>`
       : '<div class="discover-title skelet-txt"></div>'}</div>${this._skeletonHtml(8, true)}</section>`;
     if (!c || (!c.rows.length && c.pending.size)) {
-      return chips + this._scrollBoxHtml(`<div class="discover content-pane"><div class="featured skelet"></div>${skeletonRow(c && c.pending.has('similar') ? t.voorJou : '')}${skeletonRow('')}</div>`);
+      const initialRows = c && c.pending.has('similar') && this._getDiscoverSource() === 'mixed'
+        ? skeletonRow(t.zoektVoorJou) + skeletonRow('') + skeletonRow('')
+        : skeletonRow(c && c.pending.has('similar') ? t.voorJou : '') + skeletonRow('');
+      return chips + this._scrollBoxHtml(`<div class="discover content-pane"><div class="featured skelet"></div>${initialRows}</div>`);
     }
     // The recommendations are still on their way: hold their place on top.
     const waitingForSimilar = c.pending.has('similar');
@@ -1980,8 +2019,12 @@ export class MusicAssistantTouchCard extends HTMLElement {
         </div>
         <div class="carousel" id="discover-row-${r}">${rowTiles}</div></section>`;
     }).join('');
-    const placeholderRow = waitingForSimilar ? skeletonRow(t.voorJou) : '';
-    return chips + this._scrollBoxHtml(`<div class="discover content-pane">${featuredMarkup}${placeholderRow}${recommendationRows}</div>`);
+    const waitingRows = waitingForSimilar
+      ? this._getDiscoverSource() === 'mixed'
+        ? skeletonRow(t.zoektVoorJou) + skeletonRow('') + skeletonRow('')
+        : skeletonRow(t.voorJou)
+      : '';
+    return chips + this._scrollBoxHtml(`<div class="discover content-pane">${featuredMarkup}${waitingRows}${recommendationRows}</div>`);
   }
 
   // The handle on the line between player and browser: a chevron that hides
