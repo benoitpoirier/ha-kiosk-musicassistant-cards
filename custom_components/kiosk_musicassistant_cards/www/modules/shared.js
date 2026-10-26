@@ -151,7 +151,7 @@ export const TAAL = {
       username: 'Music Assistant user',
       username_help: 'Optional. Music Assistant user whose history and favourites seed the similar tracks.',
       players: 'Players', players_help: 'Music Assistant players only, one per device (empty = all of them). Music Assistant picks the protocol itself.',
-      nietMa: 'Not a Music Assistant player, the card cannot play on it:', groep: 'group',
+      nietMa: 'Not a Music Assistant player, the card cannot play on it:', gebruikMa: 'Use {name}', groep: 'group',
       autofill_similar: 'Queue 10 similar tracks when the last track plays', volume_step: 'Volume button step (%)',
     },
     ed: {
@@ -270,7 +270,7 @@ export const TAAL = {
       username: 'Music Assistant-gebruiker',
       username_help: 'Optioneel. Music Assistant-gebruiker wiens geschiedenis en favorieten de vergelijkbare nummers bepalen.',
       players: 'Spelers', players_help: 'Alleen Music Assistant-spelers, een per apparaat (leeg = allemaal). Music Assistant kiest zelf het protocol.',
-      nietMa: 'Geen Music Assistant-speler, de kaart kan er niet op afspelen:', groep: 'groep',
+      nietMa: 'Geen Music Assistant-speler, de kaart kan er niet op afspelen:', gebruikMa: '{name} gebruiken', groep: 'groep',
       autofill_similar: '10 vergelijkbare nummers toevoegen als het laatste speelt', volume_step: 'Stap volumeknoppen (%)',
     },
     ed: {
@@ -392,7 +392,7 @@ export const TAAL = {
       username: 'Utilisateur Music Assistant',
       username_help: 'Facultatif. Utilisateur Music Assistant dont l’historique et les favoris servent de base aux titres similaires.',
       players: 'Lecteurs', players_help: 'Lecteurs Music Assistant uniquement, un par appareil (vide = tous). Music Assistant choisit lui-même le protocole.',
-      nietMa: 'Pas un lecteur Music Assistant, la carte ne peut pas y jouer :', groep: 'groupe',
+      nietMa: 'Pas un lecteur Music Assistant, la carte ne peut pas y jouer :', gebruikMa: 'Utiliser {name}', groep: 'groupe',
       autofill_similar: 'Ajouter 10 titres similaires quand le dernier joue', volume_step: 'Pas des boutons de volume (%)',
     },
     ed: {

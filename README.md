@@ -197,7 +197,7 @@ links:
 | `before.unjoin` *(legacy YAML)* | Still honoured. The visual editor converts it to `solo` when its player is the zone player. |
 | `before.join.leader` / `before.join.members` *(legacy YAML)* | Still honoured. The visual editor converts it to `group_with` when the leader is the zone player. |
 
-Use Music Assistant players for playback, with one MA player per physical device. MA merges a device's protocols and chooses the output protocol itself (for example HEOS, AirPlay or DLNA). The visual editors list MA players and flag configured non-MA entities with a suggested replacement when one can be matched. A player synced to a group is followed through its group leader.
+Use Music Assistant players for playback, with one MA player per physical device. MA merges a device's protocols and chooses the output protocol itself (for example HEOS, AirPlay or DLNA). The visual editors list MA players and flag configured non-MA entities with a suggested replacement when one can be matched. Suggestions also cover stale Music Assistant entities left behind when Music Assistant recreates a player under a new ID (for example, after switching to a universal player), matching by name or by the device model in the Home Assistant registries. The now-playing editor offers the same one-click replacement. A player synced to a group is followed through its group leader.
 
 ### `music_sources` (Music Assistant users)
 

@@ -42,17 +42,53 @@ export const maPlayerOptions = (hass, current = [], groupLabel = 'group') => {
 const normalize = (s) => String(s || '').toLowerCase().normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 
-// For an entity that is not a Music Assistant player (for example the HEOS or
-// denonavr entity of a Denon), suggest the Music Assistant player of the same
-// device by comparing names. Returns an entity id or null.
-export const suggestMaPlayer = (hass, entityId) => {
+// Device model and manufacturer of every media player, from the Home Assistant
+// registries (admin only, so for the editors). Music Assistant names a player
+// as it likes ("Denon ( MA)"), but its device keeps the model of the hardware.
+let deviceInfoPromise = null;
+export const loadDeviceInfo = (hass) => {
+  if (!deviceInfoPromise) {
+    deviceInfoPromise = Promise.all([
+      hass.callWS({ type: 'config/entity_registry/list' }),
+      hass.callWS({ type: 'config/device_registry/list' }),
+    ]).then(([entities, devices]) => {
+      const byId = new Map(devices.map((d) => [d.id, d]));
+      const info = {};
+      for (const e of entities) {
+        const d = e.entity_id.startsWith('media_player.') && byId.get(e.device_id);
+        if (d) info[e.entity_id] = { model: d.model || '', manufacturer: d.manufacturer || '' };
+      }
+      return info;
+    }).catch(() => { deviceInfoPromise = null; return {}; });
+  }
+  return deviceInfoPromise;
+};
+
+// For an entity that is not a playable Music Assistant player (the HEOS or
+// denonavr entity of a Denon, or a stale Music Assistant entity left behind
+// when Music Assistant renamed the player), suggest the Music Assistant player
+// of the same device: same name, else same device model (from loadDeviceInfo),
+// else a unique partial name match. Returns an entity id or null.
+export const suggestMaPlayer = (hass, entityId, deviceInfo = {}) => {
   const state = hass && hass.states[entityId];
   if (!entityId || isMaPlayer(state)) return null;
-  const wanted = normalize(state ? playerName(state) : entityId.replace(/^media_player\./, '').replace(/_\d+$/, ''));
-  if (!wanted) return null;
   const players = listMaPlayers(hass).filter((p) => p.type !== 'group');
-  const exact = players.find((p) => normalize(p.name) === wanted);
+  const wanted = normalize(state ? playerName(state) : entityId.replace(/^media_player\./, '').replace(/_\d+$/, ''));
+  const exact = wanted && players.find((p) => normalize(p.name) === wanted);
   if (exact) return exact.entity;
+  const own = deviceInfo[entityId] || {};
+  const model = normalize(own.model);
+  if (model.length >= 4) {
+    const sameModel = players.filter((p) => {
+      const other = deviceInfo[p.entity] || {};
+      const otherModel = normalize(other.model);
+      if (otherModel.length < 4 || !(otherModel.includes(model) || model.includes(otherModel))) return false;
+      return !own.manufacturer || !other.manufacturer
+        || normalize(own.manufacturer) === normalize(other.manufacturer);
+    });
+    if (sameModel.length === 1) return sameModel[0].entity;
+  }
+  if (!wanted) return null;
   const partial = players.filter((p) => {
     const name = normalize(p.name);
     return name && (name.includes(wanted) || wanted.includes(name));

@@ -1,7 +1,7 @@
 const Q = new URL(import.meta.url).search;
 const { ICON_ALIASES, TAAL } = await import(`./shared.js${Q}`);
 const { KIOSK_THEMES } = await import(`./kiosk-theme.js${Q}`);
-const { maPlayerOptions, isMaPlayer, suggestMaPlayer } = await import(`./players.js${Q}`);
+const { maPlayerOptions, isMaPlayer, loadDeviceInfo, suggestMaPlayer } = await import(`./players.js${Q}`);
 
 const EDSTYLE = `
 :host { display:block; }
@@ -32,6 +32,7 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
+    this._deviceInfo = {};
   }
 
   setConfig(config) {
@@ -46,6 +47,13 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
   set hass(hass) {
     const isFirstUpdate = !this._hass;
     this._hass = hass;
+    if (isFirstUpdate) loadDeviceInfo(hass).then((info) => {
+      if (Object.keys(info).length) {
+        this._deviceInfo = info;
+        this._dirty = true;
+        this._renderEditor();
+      }
+    });
     if (isFirstUpdate || this._dirty) this._renderEditor();
     else this.shadowRoot.querySelectorAll('ha-form').forEach((f) => { f.hass = hass; });
   }
@@ -337,7 +345,7 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         alert.setAttribute('alert-type', 'warning');
         alert.textContent = editorText.nietMa;
         content.appendChild(alert);
-        const suggestion = suggestMaPlayer(this._hass, z.entity);
+        const suggestion = suggestMaPlayer(this._hass, z.entity, this._deviceInfo);
         if (suggestion) {
           const suggestedState = this._hass.states[suggestion];
           const suggestedName = (suggestedState && suggestedState.attributes && suggestedState.attributes.friendly_name) || suggestion;

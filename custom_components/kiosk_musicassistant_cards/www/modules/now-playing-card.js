@@ -1,7 +1,7 @@
 const Q = new URL(import.meta.url).search;
 const { safeImageUrl, VOLUME_CSS, esc, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay, autofillSimilar } = await import(`./shared.js${Q}`);
 const { THEME_COLORS } = await import(`./kiosk-theme.js${Q}`);
-const { listMaPlayers, isMaPlayer, maPlayerOptions, configuredPlayers, dropFollowers } = await import(`./players.js${Q}`);
+const { listMaPlayers, isMaPlayer, maPlayerOptions, configuredPlayers, dropFollowers, loadDeviceInfo, suggestMaPlayer } = await import(`./players.js${Q}`);
 
 const DOMAIN = 'kiosk_musicassistant_cards';
 const QUEUE_PAGE = 25;
@@ -209,9 +209,25 @@ const findHideSwitch = (states) => Object.values(states || {})
 
 // "Show buttons" mirrors the live hide switch (not the saved config) and drives it.
 export class KioskNowPlayingEditor extends HTMLElement {
+  constructor() {
+    super();
+    this._deviceInfo = {};
+  }
+
   setConfig(config) { this._config = config || {}; this._render(); }
 
-  set hass(hass) { this._hass = hass; this._render(); }
+  set hass(hass) {
+    const isFirstUpdate = !this._hass;
+    this._hass = hass;
+    if (isFirstUpdate) loadDeviceInfo(hass).then((info) => {
+      if (Object.keys(info).length) {
+        this._deviceInfo = info;
+        this._key = null;
+        this._render();
+      }
+    });
+    this._render();
+  }
 
   _render() {
     if (!this._hass || !this._config) return;
@@ -225,21 +241,56 @@ export class KioskNowPlayingEditor extends HTMLElement {
       .map((player) => player && player.entity).filter(Boolean);
     const playerOptions = maPlayerOptions(this._hass, configuredIds, labels.groep);
     const invalidIds = configuredIds.filter((id) => !isMaPlayer(this._hass.states[id]));
-    if (invalidIds.length) {
-      if (!this._playersAlert) this._playersAlert = document.createElement('ha-alert');
-      this._playersAlert.setAttribute('alert-type', 'warning');
-      this._playersAlert.textContent = `${labels.nietMa} ${invalidIds.map((id) => {
+    const suggestions = invalidIds.map((id) => {
+      const entity = suggestMaPlayer(this._hass, id, this._deviceInfo);
+      if (!entity) return null;
+      const state = this._hass.states[entity];
+      const name = (state && state.attributes && state.attributes.friendly_name) || entity;
+      return { id, entity, name };
+    }).filter(Boolean);
+    const noticeKey = JSON.stringify({ invalidIds, suggestions });
+    if (this._noticeKey === noticeKey) {
+      // Unchanged: keep the buttons, a state update must not swap them under a finger.
+    } else if (invalidIds.length) {
+      this._noticeKey = noticeKey;
+      if (!this._playersNotice) this._playersNotice = document.createElement('div');
+      const alert = document.createElement('ha-alert');
+      alert.setAttribute('alert-type', 'warning');
+      alert.textContent = `${labels.nietMa} ${invalidIds.map((id) => {
         const state = this._hass.states[id];
         return (state && state.attributes && state.attributes.friendly_name) || id;
       }).join(', ')}`;
-      if (this._playersAlert.nextSibling !== this._form) this.insertBefore(this._playersAlert, this._form);
-    } else if (this._playersAlert) {
-      this._playersAlert.remove();
-      this._playersAlert = null;
+      const children = [alert];
+      for (const suggestion of suggestions) {
+        const button = document.createElement('button');
+        button.textContent = labels.gebruikMa.replace('{name}', suggestion.name);
+        button.style.cssText = 'border:0;border-radius:999px;padding:6px 12px;margin:6px 6px 0 0;background:var(--primary-color);color:var(--text-primary-color,#fff);cursor:pointer;font:inherit';
+        button.addEventListener('click', () => {
+          const existing = configuredPlayers(this._config);
+          const players = existing.some((player) => player && player.entity === suggestion.entity)
+            ? existing.filter((player) => !player || player.entity !== suggestion.id)
+            : existing.map((player) => player && player.entity === suggestion.id
+              ? Object.assign({}, player, { entity: suggestion.entity }) : player);
+          this._config = Object.assign({}, this._config, { players });
+          delete this._config.zones;
+          this.dispatchEvent(new CustomEvent('config-changed', {
+            detail: { config: this._config }, bubbles: true, composed: true,
+          }));
+          this._key = null;
+          this._render();
+        });
+        children.push(button);
+      }
+      this._playersNotice.replaceChildren(...children);
+      if (this._playersNotice.nextSibling !== this._form) this.insertBefore(this._playersNotice, this._form);
+    } else {
+      this._noticeKey = noticeKey;
+      if (this._playersNotice) this._playersNotice.remove();
+      this._playersNotice = null;
     }
     const hide = findHideSwitch(this._hass.states);
     const data = Object.assign({}, this._config, hide ? { show_buttons: hide.state !== 'on' } : {}, { players: configuredIds });
-    const key = JSON.stringify({ data, playerOptions });
+    const key = JSON.stringify({ data, playerOptions, suggestions });
     if (this._key === key && this._form.hass === this._hass) return;
     this._key = key;
     const form = KioskNowPlayingCard.getConfigForm();
