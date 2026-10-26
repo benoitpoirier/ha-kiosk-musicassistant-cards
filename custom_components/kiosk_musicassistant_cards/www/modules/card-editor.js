@@ -1,6 +1,7 @@
 const Q = new URL(import.meta.url).search;
 const { ICON_ALIASES, TAAL } = await import(`./shared.js${Q}`);
 const { KIOSK_THEMES } = await import(`./kiosk-theme.js${Q}`);
+const { maPlayerOptions, isMaPlayer, suggestMaPlayer } = await import(`./players.js${Q}`);
 
 const EDSTYLE = `
 :host { display:block; }
@@ -25,7 +26,7 @@ const ED_LABEL = { path: 'pad', radio_mode: 'radio', count: 'aantal', fill_sourc
 // Hint line under a field in the editor. Only for the fields where a new user
 // has nothing to go on - the media id above all: it is a plain text box and
 // nothing on screen says what belongs in it or where to find it.
-const ED_HINT = { uri: 'uriHint', username: 'usernameHint' };
+const ED_HINT = { uri: 'uriHint', username: 'usernameHint', entity: 'entityHint' };
 
 export class MusicAssistantTouchCardEditor extends HTMLElement {
   constructor() {
@@ -272,25 +273,25 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
     zoneSection.className = 'section';
     zoneSection.innerHTML = `<div class="heading">${editorText.zones}</div>`;
     const zones = config.zones || [];
-    const zSchema = [
-      { name: '', type: 'grid', schema: [
-        { name: 'name', selector: { text: {} } },
-        { name: 'icon', selector: { icon: {} } },
-      ] },
-      { name: 'entity', selector: { entity: { filter: { domain: 'media_player' } } } },
-      { name: 'volume', selector: { entity: { filter: { domain: 'media_player' } } } },
-      { name: '', type: 'grid', schema: [
-        { name: 'volume_max', selector: { number: { min: 5, max: 100, step: 1, mode: 'box' } } },
-        { name: 'volume_start', selector: { number: { min: 0, max: 100, step: 1, mode: 'box' } } },
-        { name: 'volume_step', selector: { number: { min: 0.1, max: 100, step: 0.1, mode: 'box' } } },
-      ] },
-      { name: 'turn_off', selector: { entity: { filter: { domain: 'media_player' } } } },
-      { name: 'unjoin', selector: { entity: { filter: { domain: 'media_player' } } } },
-      { name: 'joinLeader', selector: { entity: { filter: { domain: 'media_player' } } } },
-      { name: 'joinMembers',
-        selector: { entity: { multiple: true, filter: { domain: 'media_player' } } } },
-    ];
     zones.forEach((z, i) => {
+      const zSchema = [
+        { name: '', type: 'grid', schema: [
+          { name: 'name', selector: { text: {} } },
+          { name: 'icon', selector: { icon: {} } },
+        ] },
+        { name: 'entity', selector: { select: { mode: 'dropdown', options: maPlayerOptions(this._hass, [z.entity], editorText.groep) } } },
+        { name: 'volume', selector: { entity: { filter: { domain: 'media_player' } } } },
+        { name: '', type: 'grid', schema: [
+          { name: 'volume_max', selector: { number: { min: 5, max: 100, step: 1, mode: 'box' } } },
+          { name: 'volume_start', selector: { number: { min: 0, max: 100, step: 1, mode: 'box' } } },
+          { name: 'volume_step', selector: { number: { min: 0.1, max: 100, step: 0.1, mode: 'box' } } },
+        ] },
+        { name: 'turn_off', selector: { entity: { filter: { domain: 'media_player' } } } },
+        { name: 'unjoin', selector: { entity: { filter: { domain: 'media_player' } } } },
+        { name: 'joinLeader', selector: { entity: { filter: { domain: 'media_player' } } } },
+        { name: 'joinMembers',
+          selector: { entity: { multiple: true, filter: { domain: 'media_player' } } } },
+      ];
       const b = z.before || {};
       const zoneFormData = {
         name: z.name || '', icon: this._iconHtml(z.icon), entity: z.entity || '',
@@ -319,7 +320,25 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         this._cfg.zones[i] = zoneConfig;
         this._emitConfigChange();
       });
-      zoneSection.appendChild(this._addPanel(z.name || editorText.naamloos, form, () => {
+      const content = document.createElement('div');
+      if (z.entity && !isMaPlayer(this._hass && this._hass.states[z.entity])) {
+        const alert = document.createElement('ha-alert');
+        alert.setAttribute('alert-type', 'warning');
+        alert.textContent = editorText.nietMa;
+        content.appendChild(alert);
+        const suggestion = suggestMaPlayer(this._hass, z.entity);
+        if (suggestion) {
+          const suggestedState = this._hass.states[suggestion];
+          const suggestedName = (suggestedState && suggestedState.attributes && suggestedState.attributes.friendly_name) || suggestion;
+          content.appendChild(this._addButton(editorText.gebruikMa.replace('{name}', suggestedName), '', () => {
+            this._cfg.zones = (this._cfg.zones || []).slice();
+            this._cfg.zones[i] = Object.assign({}, z, { entity: suggestion });
+            this._rebuildEditor();
+          }));
+        }
+      }
+      content.appendChild(form);
+      zoneSection.appendChild(this._addPanel(z.name || editorText.naamloos, content, () => {
         this._cfg.zones = zones.filter((x, k) => k !== i);
         if (!this._cfg.zones.length) delete this._cfg.zones;
         this._rebuildEditor();

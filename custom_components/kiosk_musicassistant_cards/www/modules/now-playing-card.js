@@ -1,6 +1,7 @@
 const Q = new URL(import.meta.url).search;
 const { safeImageUrl, VOLUME_CSS, esc, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay, autofillSimilar } = await import(`./shared.js${Q}`);
 const { THEME_COLORS } = await import(`./kiosk-theme.js${Q}`);
+const { listMaPlayers, isMaPlayer, maPlayerOptions } = await import(`./players.js${Q}`);
 
 const DOMAIN = 'kiosk_musicassistant_cards';
 const QUEUE_PAGE = 25;
@@ -220,12 +221,31 @@ export class KioskNowPlayingEditor extends HTMLElement {
       this.appendChild(this._form);
     }
     const labels = getLanguage(this._hass.language).npEd;
+    const configuredIds = (Array.isArray(this._config.players) ? this._config.players : [])
+      .map((player) => player && player.entity).filter(Boolean);
+    const playerOptions = maPlayerOptions(this._hass, configuredIds, labels.groep);
+    const invalidIds = configuredIds.filter((id) => !isMaPlayer(this._hass.states[id]));
+    if (invalidIds.length) {
+      if (!this._playersAlert) this._playersAlert = document.createElement('ha-alert');
+      this._playersAlert.setAttribute('alert-type', 'warning');
+      this._playersAlert.textContent = `${labels.nietMa} ${invalidIds.map((id) => {
+        const state = this._hass.states[id];
+        return (state && state.attributes && state.attributes.friendly_name) || id;
+      }).join(', ')}`;
+      if (this._playersAlert.nextSibling !== this._form) this.insertBefore(this._playersAlert, this._form);
+    } else if (this._playersAlert) {
+      this._playersAlert.remove();
+      this._playersAlert = null;
+    }
     const hide = findHideSwitch(this._hass.states);
-    const data = Object.assign({}, this._config, hide ? { show_buttons: hide.state !== 'on' } : {});
-    const key = JSON.stringify(data);
+    const data = Object.assign({}, this._config, hide ? { show_buttons: hide.state !== 'on' } : {}, { players: configuredIds });
+    const key = JSON.stringify({ data, playerOptions });
     if (this._key === key && this._form.hass === this._hass) return;
     this._key = key;
     const form = KioskNowPlayingCard.getConfigForm();
+    form.schema.splice(2, 0, { name: 'players', selector: { select: {
+      multiple: true, mode: 'dropdown', options: playerOptions,
+    } } });
     this._form.hass = this._hass;
     this._form.schema = form.schema;
     this._form.computeLabel = (schema) => labels[schema.name] || schema.name;
@@ -244,6 +264,10 @@ export class KioskNowPlayingEditor extends HTMLElement {
       }
       delete value.show_buttons;
     }
+    const existing = Array.isArray(this._config.players) ? this._config.players : [];
+    const ids = [].concat(value.players || []).filter(Boolean);
+    if (ids.length) value.players = ids.map((id) => existing.find((player) => player && player.entity === id) || { entity: id });
+    else delete value.players;
     this._config = value;
     this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: value }, bubbles: true, composed: true }));
   }
@@ -322,10 +346,7 @@ export class KioskNowPlayingCard extends HTMLElement {
   get _players() {
     if (this._configuredPlayers.length) return this._configuredPlayers;
     if (this._autoPlayers) return this._autoPlayers;
-    const states = (this._hass && this._hass.states) || {};
-    const found = Object.keys(states)
-      .filter((id) => id.startsWith('media_player.') && (states[id].attributes || {}).mass_player_type)
-      .map((id) => ({ name: states[id].attributes.friendly_name || id, entity: id }));
+    const found = listMaPlayers(this._hass).map((player) => ({ name: player.name, entity: player.entity }));
     if (found.length) this._autoPlayers = found;
     return found;
   }
@@ -837,7 +858,7 @@ export class KioskNowPlayingCard extends HTMLElement {
       <span class="st-player">${svg('mdi:speaker')}<span>${esc(playerName)}</span></span>`);
     this._patch('players', activePlayers.length > 1
       ? activePlayers.map((player) => `<button class="${player.entity === entity ? 'active' : ''}"
-          data-act="player" data-entity="${esc(player.entity)}">${svg('mdi:speaker')}<span>${esc(player.name || player.entity)}</span></button>`).join('')
+          data-act="player" data-entity="${esc(player.entity)}">${svg('mdi:speaker')}<span>${esc(player.name || ((this._hass.states[player.entity] || {}).attributes || {}).friendly_name || player.entity)}</span></button>`).join('')
       : '');
 
     // The cover, the lyrics and the queue are only rebuilt when what they show

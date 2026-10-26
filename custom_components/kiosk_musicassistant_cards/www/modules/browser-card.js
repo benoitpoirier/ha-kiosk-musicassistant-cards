@@ -4,6 +4,7 @@ const {
   normalizeSpotifyUri, autofillSimilar, PLAYING_STATES, safeImageUrl, VOLUME_CSS, defaultCategories, esc, formatDuration, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay,
 } = await import(`./shared.js${Q}`);
 const { KIOSK_CSS, KIOSK_THEMES } = await import(`./kiosk-theme.js${Q}`);
+const { listMaPlayers, findActivePlayer } = await import(`./players.js${Q}`);
 
 const DOMAIN = 'kiosk_musicassistant_cards';
 const PLAYBACK_TIMEOUT_S = 60;
@@ -724,18 +725,9 @@ export class MusicAssistantTouchCard extends HTMLElement {
   _getZones() {
     if (this._cfg.zones && this._cfg.zones.length) return this._cfg.zones;
     if (this._zones) return this._zones;
-    const players = [];
-    const states = (this._hass && this._hass.states) || {};
-    for (const id of Object.keys(states)) {
-      if (!id.startsWith('media_player.')) continue;
-      const a = states[id].attributes || {};
-      if (!a.mass_player_type) continue;
-      players.push({
-        name: a.friendly_name || id,
-        entity: id,
-        icon: a.mass_player_type === 'group' ? 'groep' : 'speaker',
-      });
-    }
+    const players = listMaPlayers(this._hass).map((p) => ({
+      name: p.name, entity: p.entity, icon: p.type === 'group' ? 'groep' : 'speaker',
+    }));
     this._zones = players.length ? players : [{ name: this._getLanguage().speler, entity: '', icon: 'speaker' }];
     return this._zones;
   }
@@ -954,23 +946,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
   _getActivePlayer() {
     if (this._activeEntityCache && this._activeHassCache === this._hass && this._activeZoneIndexCache === this._zoneIndex) return this._activeEntityCache;
     const selectedPlayer = this._getPlayerEntity();
-    const s = this._getState(selectedPlayer);
-    let activePlayerEntity = selectedPlayer;
-    if (!(s && PLAYING_STATES.includes(s.state))) {
-      const q = s && s.attributes ? s.attributes.active_queue : null;
-      let groupPlayer = null;
-      for (const playerZone of this._getZones()) {
-        const id = playerZone.entity;
-        if (!id || id === selectedPlayer || !id.startsWith('media_player.')) continue;
-        const player = this._getState(id);
-        if (!player) continue;
-        const a = player.attributes || {};
-        if (!a.mass_player_type || !PLAYING_STATES.includes(player.state)) continue;
-        if (q && a.active_queue === q) { groupPlayer = id; break; }
-        if (!groupPlayer && (a.group_members || []).indexOf(selectedPlayer) !== -1) groupPlayer = id;
-      }
-      activePlayerEntity = groupPlayer || selectedPlayer;
-    }
+    const activePlayerEntity = findActivePlayer(this._hass, selectedPlayer, this._getZones().map((z) => z.entity));
     this._activeHassCache = this._hass;
     this._activeZoneIndexCache = this._zoneIndex;
     this._activeEntityCache = activePlayerEntity;

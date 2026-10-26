@@ -195,6 +195,8 @@ links:
 | `before.unjoin` | Player to detach from its group first. |
 | `before.join.leader` / `before.join.members` | Group these players before playing. |
 
+Use Music Assistant players for playback, with one MA player per physical device. MA merges a device's protocols and chooses the output protocol itself (for example HEOS, AirPlay or DLNA). The visual editors list MA players and flag configured non-MA entities with a suggested replacement when one can be matched.
+
 ### `music_sources` (Music Assistant users)
 
 Lets several people switch between their own accounts (for example one Spotify account each). Requires Music Assistant users whose provider filter selects the matching account.
@@ -268,7 +270,7 @@ favorite_accounts:
 | `height` | `560` | Card height in pixels (420 to 780). `0` (or `auto`) = Auto: fill the remaining screen height below the card, e.g. a full-screen panel view on a kiosk. The legacy `fill: true` still works. |
 | `fill_margin` | `8` | Bottom margin in pixels in Auto height. |
 | `language` | HA language | `en`, `fr` or `nl`. |
-| `players` | all Music Assistant players | Players to follow. The card shows the one that is playing (or the most recently paused). When several play at once, buttons let you choose. |
+| `players` | all Music Assistant players | Players to follow. The visual editor now includes a Players field. The card shows the one that is playing (or the most recently paused). When several play at once, buttons let you choose. |
 | `volume_step` | `1` | Volume button step (%). The -/+ buttons repeat while held. |
 | `theme` | `sunset` | Accent colours, same names as the browser card `theme`. |
 | `autofill_similar` | `true` | When the track that plays is the last one of the queue, queue 10 similar tracks. |
