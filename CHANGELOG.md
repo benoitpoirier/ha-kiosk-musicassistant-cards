@@ -2,6 +2,10 @@
 
 All notable changes to Kiosk Music Assistant Cards, newest first, grouped by minor version.
 
+## 1.11 (1.11.0)
+
+- **Music playing sensor follows Music Assistant itself**, not a fixed list of Home Assistant player ids. *Kiosk automations keep working when Music Assistant renames a player, cover every room and group, and no longer switch back to the screensaver while another speaker is still playing.*
+
 ## 1.10 (1.10.0 to 1.10.1)
 
 **Every person gets their own music**

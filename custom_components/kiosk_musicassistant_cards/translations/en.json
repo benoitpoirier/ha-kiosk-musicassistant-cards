@@ -16,6 +16,11 @@
       "hide_controls": {
         "name": "Hide player buttons"
       }
+    },
+    "binary_sensor": {
+      "music_playing": {
+        "name": "Music playing"
+      }
     }
   },
   "services": {

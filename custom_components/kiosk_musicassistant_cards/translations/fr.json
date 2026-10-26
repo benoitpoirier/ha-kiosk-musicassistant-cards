@@ -16,6 +16,11 @@
       "hide_controls": {
         "name": "Masquer les boutons du lecteur"
       }
+    },
+    "binary_sensor": {
+      "music_playing": {
+        "name": "Musique en cours"
+      }
     }
   },
   "services": {

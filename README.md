@@ -50,6 +50,7 @@ Both cards are responsive and tuned for a 1280×800 kiosk (Echo Show 8 class): t
 
 See the [CHANGELOG](CHANGELOG.md) for the full history.
 
+- **Music playing sensor** (1.11): follows Music Assistant players and groups directly, so kiosk automations keep working when a player gets a new Home Assistant entity id.
 - **Pick a speaker, not an entity** (1.8 – 1.9): the editors only list Music Assistant players, one per device. Music Assistant chooses the protocol (HEOS, AirPlay, DLNA…) itself, so the many Home Assistant entities of one device no longer matter. Wrong or stale entities are flagged with a one-click replacement, matched by name or by device model.
 - **Speaker groups from Music Assistant** (1.9): `group_with` and `solo` replace the old join/unjoin options; a player synced to a group is followed through its leader.
 - **Each person gets their own Discover feed** (1.10): Music Assistant's play-log rows are global, so for a music source they are replaced by rows from that user's library; Top Picks follow the user too.
@@ -299,6 +300,49 @@ actions:
   - action: "switch.turn_{{ trigger.to_state.state }}"
     target:
       entity_id: switch.kiosk_music_assistant_cards_hide_player_buttons
+```
+
+### Music playing sensor
+
+The integration creates a *Music playing* binary sensor that is on while any available, enabled Music Assistant player or group is playing. It reads Music Assistant's player list directly rather than watching a fixed list of Home Assistant `media_player` entity ids. This matters because Music Assistant can recreate a player under a new id (for example, `media_player.denon_avr_x3500h_3` becoming `_4`), and one physical device can also have several Home Assistant entities. The sensor follows every Music Assistant player and group, regardless of those entity ids.
+
+Its `players`, `player_ids` and `entity_ids` attributes list the currently playing players by name, Music Assistant id and matching Home Assistant entity id. The sensor becomes unavailable when Music Assistant is disconnected.
+
+Use the state trigger to show the kiosk dashboard when music starts, and also check the sensor after Home Assistant starts. When it has been off for 30 seconds, return to the screensaver mode. Replace the example select entity and option names with those provided by your kiosk integration.
+
+```yaml
+automation:
+  - alias: Kiosk - show dashboard while music plays
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.kiosk_music_assistant_cards_music_playing
+        to: "on"
+      - trigger: homeassistant
+        event: start
+    conditions:
+      - condition: state
+        entity_id: binary_sensor.kiosk_music_assistant_cards_music_playing
+        state: "on"
+    actions:
+      - action: select.select_option
+        target:
+          entity_id: select.my_tablet_screensaver_mode
+        data:
+          option: Home Assistant Dashboard
+
+  - alias: Kiosk - return to screensaver when music stops
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.kiosk_music_assistant_cards_music_playing
+        from: "on"
+        to: "off"
+        for: "00:00:30"
+    actions:
+      - action: select.select_option
+        target:
+          entity_id: select.my_tablet_screensaver_mode
+        data:
+          option: Screensaver
 ```
 
 ## Example: wall kiosk with Kiosk Satellite

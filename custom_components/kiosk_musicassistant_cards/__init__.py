@@ -38,7 +38,7 @@ from .recommendations import (
 )
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
-PLATFORMS = [Platform.SWITCH]
+PLATFORMS = [Platform.BINARY_SENSOR, Platform.SWITCH]
 
 WWW_PATH = Path(__file__).parent / "www"
 SERVICE_GET_TRACK_LYRICS = "get_track_lyrics"
