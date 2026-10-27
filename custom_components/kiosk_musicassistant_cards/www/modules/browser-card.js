@@ -674,11 +674,27 @@ export class MusicAssistantTouchCard extends HTMLElement {
         if (!pendingState.pending.size) {
           pendingState.updatedAt = Date.now();
           this._warmOtherSources(source, data.include_hidden);
+          this._retryEmptyDiscover(pendingState);
         }
         buildRows();
       });
     }));
   }
+  // An empty feed usually means Music Assistant was still starting (after a
+  // Home Assistant restart): try again a few times instead of caching it.
+  _retryEmptyDiscover(state) {
+    const empty = !Object.values(state.sources).some((rows) => rows && rows.length);
+    const retries = this._discoverRetries && this._discoverRetries.key === state.key ? this._discoverRetries : { key: state.key, count: 0 };
+    this._discoverRetries = retries;
+    if (!empty) { retries.count = 0; return; }
+    if (retries.count >= 5) return;
+    retries.count++;
+    state.updatedAt = 0;
+    setTimeout(() => {
+      if (this._discoverState === state && this.isConnected) this._fetchDiscoverRows(false);
+    }, 15000 * retries.count);
+  }
+
   _warmOtherSources(discoverSource, includeHidden) {
     if (!['similar', 'mixed'].includes(discoverSource)) return;
     this._discoverWarmups = this._discoverWarmups || new Map();

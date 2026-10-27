@@ -2,8 +2,9 @@
 
 All notable changes to Kiosk Music Assistant Cards, newest first, grouped by minor version.
 
-## 1.11 (1.11.0 to 1.11.3)
+## 1.11 (1.11.0 to 1.11.4)
 
+- **Discover fills itself after a Home Assistant restart.** An empty feed (Music Assistant still starting) is fetched again automatically instead of waiting for *Refresh*.
 - **Fewer Spotify requests per tap.** A track from the Discover rows is handed to Music Assistant complete, so Home Assistant no longer asks Spotify for it first. *Music Assistant 2.10 still looks up each track it has not played before (outside your library) once with Spotify; with Music Assistant's shared Spotify app this can take 5 to 80 seconds when Spotify limits traffic. Set your own Spotify Client ID in each Spotify provider of Music Assistant to avoid it (see README).*
 - **Similar songs added to the queue start just as fast**, and are added whenever the track that plays is the last one of the queue.
 - **Fewer Spotify requests in the background**: the recommendations are refreshed every 2 hours instead of every 30 minutes.
