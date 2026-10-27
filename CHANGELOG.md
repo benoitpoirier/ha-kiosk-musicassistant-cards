@@ -2,8 +2,9 @@
 
 All notable changes to Kiosk Music Assistant Cards, newest first, grouped by minor version.
 
-## 1.11 (1.11.0 to 1.11.1)
+## 1.11 (1.11.0 to 1.11.2)
 
+- **Every track of the browser starts without asking Spotify first**: search results, album and playlist tracks and older Discover rows are sent with the title and cover the card shows. *Before, a track not in the latest Discover rows could wait more than a minute when Spotify limited traffic.*
 - **Tracks start in about 3 seconds, even when Spotify slows down.** A track from the Discover rows is handed to Music Assistant complete, so neither Home Assistant nor Music Assistant asks Spotify for it again before playing. *Before, each tap waited for one or two Spotify requests, which could take 5 to 80 seconds when Spotify was limiting traffic, or never start.*
 - **Similar songs added to the queue start just as fast**, and are added whenever the track that plays is the last one of the queue.
 - **Fewer Spotify requests in the background**: the recommendations are refreshed every 2 hours instead of every 30 minutes.

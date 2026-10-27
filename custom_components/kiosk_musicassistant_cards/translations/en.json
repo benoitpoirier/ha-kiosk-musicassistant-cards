@@ -149,6 +149,22 @@
         "autofill_similar": {
           "name": "Add similar tracks",
           "description": "Once the track plays, queue similar tracks if it is alone in the queue."
+        },
+        "name": {
+          "name": "Title",
+          "description": "Optional title as listed. With the cover, lets the track start without a provider lookup."
+        },
+        "artist": {
+          "name": "Artist",
+          "description": "Optional artists as listed, separated by \", \"."
+        },
+        "album": {
+          "name": "Album",
+          "description": "Optional album name as listed."
+        },
+        "image": {
+          "name": "Cover",
+          "description": "Optional cover URL (http or https) as listed."
         }
       }
     },

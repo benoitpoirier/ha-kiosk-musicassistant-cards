@@ -529,11 +529,15 @@ data:
   uri: spotify://track/5XEHDW9XdDosfI5pltNDq1
   username: alice   # optional
   autofill_similar: true   # optional, default false
+  name: Song title   # optional, as listed
+  artist: Artist   # optional, as listed (", " between artists)
+  album: Album   # optional, as listed
+  image: https://i.scdn.co/image/...   # optional, cover as listed
 ```
 
 Plays a track at once in place of the track that is playing: the new track is inserted after the current one and started, then the previous one is removed from the queue when Music Assistant allows it; the rest of the queue is kept. With `autofill_similar`, once the track plays and nothing follows it in the queue, similar tracks are added in the background. The browser card uses it for every single track (search results, album or playlist tracks, Discover, track tiles). Albums, playlists, artists and radio stations replace the whole queue.
 
-The track is sent straight to Music Assistant. A track shown in the Discover rows is sent complete, as Music Assistant returned it, so playback starts without any request to the music provider (Spotify can make such requests wait up to a minute when it limits traffic). Other uris are resolved once by Music Assistant. The caller must be allowed to control the player, and the Music Assistant user (`username`, else the Home Assistant user) must have access to it: otherwise the action fails with Music Assistant's message.
+The track is sent straight to Music Assistant. A track shown in the Discover rows is sent complete, as Music Assistant returned it, so playback starts without any request to the music provider (Spotify can make such requests wait up to a minute when it limits traffic). For other provider tracks, `name` and `image` (the card sends what it listed) let Music Assistant start the track the same way; without them, or for `library://` uris, the uri is resolved by Music Assistant. The caller must be allowed to control the player, and the Music Assistant user (`username`, else the Home Assistant user) must have access to it: otherwise the action fails with Music Assistant's message.
 ### `kiosk_musicassistant_cards.play_tracks`
 
 ```yaml

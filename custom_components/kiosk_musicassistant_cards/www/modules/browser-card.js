@@ -537,6 +537,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
     this._playbackProgress = null;
     this._playbackSequence = 0;
     this._imageCache = {};      // uri -> the cover Music Assistant has right now
+    this._trackInfo = new Map(); // track uri -> { name, artist, album, image } as listed
     this._sourceCache = {};       // source key -> { updatedAt, items }
     this._pendingSources = {};  // source key -> in-flight promise, so two draws fetch once
     this._discoverState = null;   // { key, updatedAt, rows } of the discover feed
@@ -786,11 +787,31 @@ export class MusicAssistantTouchCard extends HTMLElement {
 
   // Every library answer also feeds the cover index, so a hand-made tile that
   // happens to point at the same uri gets a fresh image for free.
+  // Tracks also keep what the listing showed: play_now hands it to Music
+  // Assistant, which can then start the track without asking its provider.
   _rememberImages(items) {
     for (const it of items || []) {
       const u = it.uri || it.media_content_id;
       if (u && it.image) this._imageCache[u] = it.image;
+      const name = it.name || it.title;
+      const image = it.image || it.thumbnail;
+      if (!u || !name || !image || mediaTypeFromUri(u) !== 'track') continue;
+      const artist = typeof it.artist === 'string' ? it.artist
+        : (it.artists || []).map((a) => a && a.name).filter(Boolean).join(', ');
+      const album = (it.album && it.album.name) || '';
+      this._trackInfo.delete(u);
+      this._trackInfo.set(u, { name, artist, album, image });
+      if (this._trackInfo.size > 2000) this._trackInfo.delete(this._trackInfo.keys().next().value);
     }
+  }
+
+  _listing(uri) {
+    const info = this._trackInfo.get(uri);
+    if (!info) return {};
+    const data = { name: info.name, image: info.image };
+    if (info.artist) data.artist = info.artist;
+    if (info.album) data.album = info.album;
+    return data;
   }
 
   _fetchCategory(b) {
@@ -1429,6 +1450,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
         }
         await this._call(DOMAIN, 'play_now', this._withUser({
           entity_id: entity, uri, autofill_similar: this._cfg.autofill_similar !== false,
+          ...this._listing(uri),
         }, username));
         if (playbackStatus && this._playbackProgress === playbackStatus) {
           playbackStatus.accepted = true;
@@ -1537,6 +1559,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
         media_content_type: mediaType,
       });
       this._detailItems = (r && r.children) || [];
+      this._rememberImages(this._detailItems);
     } catch (e) {
       this._showError(e);
     }
