@@ -30,6 +30,104 @@ _INSTANCE_URI = re.compile(r"^([a-z0-9_]+)--[A-Za-z0-9]+://")
 
 def _portable_uri(uri: str) -> str:
     return _INSTANCE_URI.sub(r"\1://", uri)
+
+
+# ---------- full track objects ----------
+# Playing a provider uri makes Music Assistant fetch the track from the
+# provider first (Spotify: GET /v1/tracks/<id>), and Home Assistant's
+# play_media verifies it once more. Under Spotify's rate limiting each fetch
+# can wait 5-80 s. The similar-track answers already hold the full tracks:
+# they are kept here (and saved with the feeds) and handed to Music Assistant
+# as they are, which starts playback without any provider request.
+DATA_TRACKS = "kiosk_musicassistant_cards_tracks"
+DATA_USERS = "kiosk_musicassistant_cards_users"
+MAX_TRACKS = 3000
+USERS_TTL = 600
+
+
+def _slim(raw: dict[str, Any]) -> dict[str, Any]:
+    """Drop the metadata Music Assistant does not need to play a track."""
+    def strip(obj: Any) -> Any:
+        if not isinstance(obj, dict):
+            return obj
+        obj = dict(obj)
+        meta = obj.get("metadata")
+        if isinstance(meta, dict):
+            obj["metadata"] = {"images": meta.get("images")} if meta.get("images") else {}
+        return obj
+
+    track = strip(raw)
+    track["album"] = strip(track.get("album"))
+    track["artists"] = [strip(a) for a in track.get("artists") or []]
+    return track
+
+
+def _remember_tracks(hass: HomeAssistant, user: str | None, raw_items: list[Any]) -> None:
+    tracks: dict[tuple, dict[str, Any]] = hass.data.setdefault(DATA_TRACKS, {})
+    for raw in raw_items:
+        if not isinstance(raw, dict) or raw.get("media_type") != "track" or not raw.get("uri"):
+            continue
+        key = (user or "", _portable_uri(raw["uri"]))
+        tracks.pop(key, None)
+        tracks[key] = _slim(raw)
+    while len(tracks) > MAX_TRACKS:
+        tracks.pop(next(iter(tracks)))
+
+
+def remembered_track(hass: HomeAssistant, user: str | None, uri: str) -> dict[str, Any] | None:
+    return hass.data.get(DATA_TRACKS, {}).get((user or "", _portable_uri(uri)))
+
+
+async def _async_allowed_providers(hass: HomeAssistant, mass: Any, user: str | None) -> set[str] | None:
+    """The music provider instances a Music Assistant user may use; None when unrestricted or unknown."""
+    if not user:
+        return None
+    cache = hass.data.setdefault(DATA_USERS, {})
+    if time.monotonic() - cache.get("time", 0) > USERS_TTL:
+        try:
+            users = await mass.send_command("auth/users")
+            cache["filters"] = {
+                u.get("username"): set(u.get("provider_filter") or [])
+                for u in users if isinstance(u, dict)
+            }
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Could not read the Music Assistant users: %s", err)
+            cache.setdefault("filters", {})
+        cache["time"] = time.monotonic()
+    return cache["filters"].get(user) or None
+
+
+async def async_playable_track(
+    hass: HomeAssistant, mass: Any, user: str | None, raw: dict[str, Any]
+) -> dict[str, Any] | None:
+    """The track bound to accounts the user may play from, or None if it has none."""
+    allowed = await _async_allowed_providers(hass, mass, user)
+    if allowed is None:
+        return raw
+    mappings = []
+    for mapping in raw.get("provider_mappings") or []:
+        instance = mapping.get("provider_instance")
+        if instance in allowed:
+            mappings.append(mapping)
+            continue
+        # Similar-track answers are shared between users: move the mapping to
+        # this user's account of the same provider.
+        domain = mapping.get("provider_domain")
+        own = sorted(i for i in allowed if i == domain or i.startswith(f"{domain}--"))
+        if own:
+            mappings.append({**mapping, "provider_instance": own[0]})
+    if not mappings:
+        return None
+    if raw.get("provider") == "library":
+        return {**raw, "provider_mappings": mappings}
+    first = mappings[0]
+    return {
+        **raw,
+        "provider_mappings": mappings,
+        "item_id": first["item_id"],
+        "provider": first["provider_instance"],
+        "uri": f"{first['provider_instance']}://track/{first['item_id']}",
+    }
 TOP_PICKS_LIMIT = 9
 MAX_TOP_PICKS_LIMIT = 100
 RECENTLY_PLAYED_LIMIT = 12
@@ -52,7 +150,9 @@ SEED_COUNT = 6
 SEED_ROWS = 3
 SIMILAR_LIMIT = 25
 SIMILAR_TIMEOUT = 15
-CACHE_TTL = 30 * 60
+# Every rebuild asks the provider for new seeds: under Spotify's rate limit
+# these requests delay playback, so feeds are rebuilt every 2 hours at most.
+CACHE_TTL = 2 * 3600
 KEEP_WARM = 24 * 3600
 DATA_CACHE = "kiosk_musicassistant_cards_recommendations"
 DATA_STORE = "kiosk_musicassistant_cards_recommendations_store"
@@ -444,6 +544,8 @@ async def _async_similar_rows(
     chosen = random.sample(pool, min(SEED_COUNT, len(pool)))
 
     answers = await asyncio.gather(*(_async_similar(mass, user, seed) for seed in chosen))
+    for raw_items in answers:
+        _remember_tracks(hass, user, raw_items)
     known = {f"{s['name'].lower()}|{s['artist'].lower()}" for s in pool}
 
     def items_for(raw_items: list[Any], reason: str) -> list[dict[str, Any]]:
@@ -602,12 +704,21 @@ def _async_schedule_save(hass: HomeAssistant) -> None:
         return
 
     def data() -> dict[str, Any]:
+        feeds = [
+            {"params": entry["params"], "rows": entry["rows"], "wall": entry.get("wall", 0)}
+            for entry in _store(hass).values()
+            if entry["rows"]
+        ]
+        # Only the tracks shown in a saved feed: the first tap after a restart
+        # must not wait for the provider either.
+        shown = {
+            ((feed["params"].get("user") or ""), item.get("uri"))
+            for feed in feeds for row in feed["rows"] for item in row.get("items") or []
+        }
+        tracks = hass.data.get(DATA_TRACKS, {})
         return {
-            "feeds": [
-                {"params": entry["params"], "rows": entry["rows"], "wall": entry.get("wall", 0)}
-                for entry in _store(hass).values()
-                if entry["rows"]
-            ]
+            "feeds": feeds,
+            "tracks": [[user, uri, raw] for (user, uri), raw in tracks.items() if (user, uri) in shown],
         }
 
     store.async_delay_save(data, STORE_SAVE_DELAY)
@@ -623,12 +734,18 @@ async def async_load_cache(hass: HomeAssistant) -> None:
         _LOGGER.debug("Could not load the saved recommendations: %s", err)
         return
     now, wall = time.monotonic(), time.time()
+    tracks = hass.data.setdefault(DATA_TRACKS, {})
+    for saved_track in saved.get("tracks") or []:
+        if isinstance(saved_track, list) and len(saved_track) == 3 and isinstance(saved_track[2], dict):
+            tracks[(saved_track[0] or "", saved_track[1])] = saved_track[2]
     for feed in saved.get("feeds") or []:
         age = wall - float(feed.get("wall") or 0)
         params = feed.get("params")
         if not isinstance(params, dict) or not feed.get("rows") or not 0 <= age < KEEP_WARM:
             continue
         key = tuple(sorted(params.items()))
+        if "tracks" not in saved:
+            age = CACHE_TTL  # saved by an older version: rebuild it to get its tracks
         _store(hass).setdefault(
             key,
             # Marked as used now: the keep-warm timer refreshes it during the next day.

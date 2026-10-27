@@ -2,8 +2,12 @@
 
 All notable changes to Kiosk Music Assistant Cards, newest first, grouped by minor version.
 
-## 1.11 (1.11.0)
+## 1.11 (1.11.0 to 1.11.1)
 
+- **Tracks start in about 3 seconds, even when Spotify slows down.** A track from the Discover rows is handed to Music Assistant complete, so neither Home Assistant nor Music Assistant asks Spotify for it again before playing. *Before, each tap waited for one or two Spotify requests, which could take 5 to 80 seconds when Spotify was limiting traffic, or never start.*
+- **Similar songs added to the queue start just as fast**, and are added whenever the track that plays is the last one of the queue.
+- **Fewer Spotify requests in the background**: the recommendations are refreshed every 2 hours instead of every 30 minutes.
+- **Clear error when a person may not use a speaker** (Music Assistant user without access to that player) instead of nothing happening.
 - **Music playing sensor follows Music Assistant itself**, not a fixed list of Home Assistant player ids. *Kiosk automations keep working when Music Assistant renames a player, cover every room and group, and no longer switch back to the screensaver while another speaker is still playing.*
 
 ## 1.10 (1.10.0 to 1.10.1)

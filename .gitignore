@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 # Local assistant notes describing a private Home Assistant instance.
 .github/copilot-instructions.md
+# Local debugging scripts and measurements.
+debug/
