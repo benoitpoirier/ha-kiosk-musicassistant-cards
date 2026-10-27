@@ -133,18 +133,6 @@ play_now:
       default: false
       selector:
         boolean:
-    name:
-      selector:
-        text:
-    artist:
-      selector:
-        text:
-    album:
-      selector:
-        text:
-    image:
-      selector:
-        text:
 
 remove_queue_item:
   fields:

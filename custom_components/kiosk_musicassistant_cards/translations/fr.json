@@ -149,22 +149,6 @@
         "autofill_similar": {
           "name": "Ajouter des titres similaires",
           "description": "Une fois le titre lancé, ajoute des titres similaires à la file s'il y est seul."
-        },
-        "name": {
-          "name": "Titre",
-          "description": "Titre facultatif tel qu'affiché. Avec la pochette, permet de lancer le titre sans interroger le fournisseur."
-        },
-        "artist": {
-          "name": "Artiste",
-          "description": "Artistes facultatifs tels qu'affichés, séparés par « , »."
-        },
-        "album": {
-          "name": "Album",
-          "description": "Nom d'album facultatif tel qu'affiché."
-        },
-        "image": {
-          "name": "Pochette",
-          "description": "URL de pochette facultative (http ou https) telle qu'affichée."
         }
       }
     },

@@ -24,7 +24,6 @@ from .recommendations import (
     _remember_tracks,
     _seed_from_uri,
     async_playable_track,
-    listed_track,
     remembered_track,
 )
 
@@ -147,18 +146,11 @@ def _ma_user(call: ServiceCall) -> Any:
     return user_from_context(call.context) if user_from_context else None
 
 
-async def _async_media(
-    hass: HomeAssistant, mass: Any, user: Any, uris: list[str], listing: dict[str, Any] | None = None
-) -> list[Any]:
+async def _async_media(hass: HomeAssistant, mass: Any, user: Any, uris: list[str]) -> list[Any]:
     username = user if isinstance(user, str) else None
     media: list[Any] = []
     for uri in uris:
         raw = remembered_track(hass, username, uri)
-        if raw is None and listing:
-            raw = listed_track(
-                mass, uri, listing.get("name"), listing.get("artist"),
-                listing.get("image"), listing.get("album"),
-            )
         track = await async_playable_track(hass, mass, username, raw) if raw else None
         media.append(track or uri)
     return media
@@ -271,11 +263,6 @@ PLAY_NOW_SCHEMA = vol.Schema(
         vol.Required("uri"): cv.string,
         vol.Optional("username"): cv.string,
         vol.Optional("autofill_similar", default=False): cv.boolean,
-        # What the card showed for the track: lets it start without a provider lookup.
-        vol.Optional("name"): cv.string,
-        vol.Optional("artist"): cv.string,
-        vol.Optional("album"): cv.string,
-        vol.Optional("image"): cv.string,
     }
 )
 
@@ -299,7 +286,7 @@ async def async_play_now(call: ServiceCall) -> None:
     player["generation"] += 1  # also stops the background append of play_tracks
     generation = player["generation"]
 
-    media = await _async_media(hass, mass, user, [call.data["uri"]], call.data)
+    media = await _async_media(hass, mass, user, [call.data["uri"]])
     previous = None
     async with player["lock"]:
         if generation != player["generation"]:

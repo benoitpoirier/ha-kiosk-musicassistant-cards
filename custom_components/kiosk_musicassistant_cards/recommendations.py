@@ -78,58 +78,6 @@ def remembered_track(hass: HomeAssistant, user: str | None, uri: str) -> dict[st
     return hass.data.get(DATA_TRACKS, {}).get((user or "", _portable_uri(uri)))
 
 
-_TRACK_URI = re.compile(r"^([a-z0-9_]+(?:--[A-Za-z0-9]+)?)://track/(.+)$")
-
-
-def listed_track(
-    mass: Any, uri: str, name: str | None, artist: str | None, image: str | None,
-    album: str | None = None,
-) -> dict[str, Any] | None:
-    """A provider track built from what a listing showed, so Music Assistant needs no lookup.
-
-    Music Assistant fetches a queued track from its provider unless it is in
-    the library or its album carries an image: the album built here holds the
-    cover the listing showed. Library uris need no lookup and are left alone.
-    """
-    match = _TRACK_URI.match(uri or "")
-    if not match or match.group(1) == "library" or not name:
-        return None
-    if not image or not image.startswith(("http://", "https://")):
-        return None
-    provider = mass.get_provider(match.group(1))
-    if provider is None:
-        return None
-    instance, item_id = provider.instance_id, match.group(2)
-    mapping = {
-        "item_id": item_id,
-        "provider_domain": provider.domain,
-        "provider_instance": instance,
-        "available": True,
-    }
-    images = [{"type": "thumb", "path": image, "provider": instance, "remotely_accessible": True}]
-    return {
-        "media_type": "track",
-        "item_id": item_id,
-        "provider": instance,
-        "name": name,
-        "provider_mappings": [mapping],
-        "artists": [
-            {"media_type": "artist", "item_id": a, "provider": instance, "name": a}
-            for a in (artist or "").split(", ") if a
-        ],
-        # Only the cover is known, not the album id: the track id stands in.
-        "album": {
-            "media_type": "album",
-            "item_id": item_id,
-            "provider": instance,
-            "name": album or "",
-            "provider_mappings": [mapping],
-            "metadata": {"images": images},
-        },
-        "metadata": {"images": images},
-    }
-
-
 async def _async_allowed_providers(hass: HomeAssistant, mass: Any, user: str | None) -> set[str] | None:
     """The music provider instances a Music Assistant user may use; None when unrestricted or unknown."""
     if not user:
