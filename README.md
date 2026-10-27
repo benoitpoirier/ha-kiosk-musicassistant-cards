@@ -63,7 +63,21 @@ See the [CHANGELOG](CHANGELOG.md) for the full history.
 - Home Assistant with the official **Music Assistant** integration configured.
 - Tested with Home Assistant 2026.10 and Music Assistant 2.10.
 - Optional: [SpotifyPlus](https://github.com/thlucas1/homeassistantcomponent_spotifyplus) for the favourite (heart) button of the now-playing card.
-- Recommended with Spotify: your own **Spotify Client ID** in each Spotify provider of Music Assistant (Settings > Providers > Spotify > reconfigure). Before playing a track that is neither in your library nor played before, Music Assistant looks it up once with Spotify; with Music Assistant's shared Spotify app this request is heavily rate limited and a tap can take 5 to 80 seconds to start.
+- Recommended with Spotify: your own **Spotify Client ID** in each Spotify provider of Music Assistant, see [Fast playback with Spotify](#fast-playback-with-spotify).
+
+## Fast playback with Spotify
+
+The cards hand every tap to Music Assistant, so how fast a track starts depends on Music Assistant and Spotify. With the settings below a track starts in about 2.5 to 4 seconds (measured with Music Assistant 2.10 on a Sendspin speaker).
+
+1. **Use your own Spotify Client ID** (most important). Before playing a track that is neither in your Music Assistant library nor played before, Music Assistant looks it up once with Spotify's Web API. With Music Assistant's shared Spotify app these requests are heavily rate limited: a tap can take 5 to 80 seconds, or seem to do nothing. With your own Client ID the lookup takes about 0.1 second.
+   - On [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard), create an app with the **Web API**, and add the redirect URI `https://music-assistant.io/callback` exactly (https, no trailing slash).
+   - Under **User Management**, add every Spotify account that will use the app (an app in development mode only accepts listed users). One app can serve the whole household.
+   - In Music Assistant: Settings > Providers > each Spotify provider > reconfigure, enter the Client ID and sign in again.
+2. **Give each person a Music Assistant user** ([`music_sources`](#music_sources-music-assistant-users)) limited to their own Spotify provider, and keep its player list up to date: a player that was re-added gets a new id, and a stale id makes playback fail with a "no access" error.
+3. **Sync your Spotify library** in Music Assistant (default): tracks in the library start without any Spotify lookup, and a track played once stays cached.
+4. **Avoid extra Spotify traffic**: every request of a Spotify provider shares its rate limit. Keep the default Discover refresh and do not run other tools polling the same Spotify provider.
+
+What the cards cannot shorten: Music Assistant waits about 2 seconds for the speaker to drain its buffer when it switches tracks, and needs about 3 more seconds to restart its Spotify engine after a long pause. Waking an amplifier in standby also adds a few seconds to the first track.
 
 ## Installation
 
