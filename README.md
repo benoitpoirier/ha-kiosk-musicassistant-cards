@@ -138,6 +138,7 @@ music_sources:
   - name: Alice
     icon: mdi:spotify
     username: alice
+    provider: spotify--instance-id
     connect_entity: media_player.spotify_alice
     spotify_entity: media_player.spotifyplus_alice
   - name: Bob
@@ -224,10 +225,11 @@ Lets several people switch between their own accounts (for example one Spotify a
 | --- | --- |
 | `name`, `icon` | Label and icon of the button. |
 | `username` | **Required.** Music Assistant username. |
+| `provider` | Optional Music Assistant provider instance id (the prefix before `://` in a player’s `media_content_id`, for example `spotify--vBxfzzeZ`). Used to select this source when the card opens on a player already playing from that provider. |
 | `connect_entity` | Optional Spotify `media_player` of this account. No longer used: switching source keeps the current playback running. |
 | `spotify_entity` | Optional [SpotifyPlus](https://github.com/thlucas1/homeassistantcomponent_spotifyplus) `media_player` of this account. Its Spotify listening history (top tracks of the last weeks, recently played) seeds the *Discover* recommendations. |
 
-The selected source is remembered per dashboard in the browser local storage and shared with the now-playing card on that dashboard.
+The selected source is remembered per dashboard in the browser local storage and shared with the now-playing card on that dashboard. Each time the card opens, it selects the zone if exactly one of its zones is playing; it selects the matching source using the configured `provider`, then a learned provider-to-user mapping, then the last source used by the card on that player. If the source cannot be identified, the saved/current source is kept. This selection never transfers or changes playback. Learned player/source mappings are stored locally per Music Assistant config entry.
 
 ### `categories`
 

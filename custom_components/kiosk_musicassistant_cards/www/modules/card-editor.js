@@ -387,6 +387,7 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         { name: 'icon', selector: { icon: {} } },
       ] },
       { name: 'username', required: true, selector: { text: {} } },
+      { name: 'provider', selector: { text: {} } },
       { name: 'connect_entity', selector: { entity: {
         filter: { domain: 'media_player', integration: 'spotify' },
       } } },
@@ -397,11 +398,13 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
     sources.forEach((source, index) => {
       const form = this._appendForm(sSchema, {
         name: source.name || '', icon: this._iconHtml(source.icon), username: source.username || '',
+        provider: source.provider || '',
         connect_entity: source.connect_entity || '',
         spotify_entity: source.spotify_entity || '',
       }, (value) => {
         const entry = { name: value.name, username: (value.username || '').trim() };
         if (value.icon) entry.icon = value.icon;
+        if ((value.provider || '').trim()) entry.provider = value.provider.trim();
         if (value.connect_entity) entry.connect_entity = value.connect_entity;
         if (value.spotify_entity) entry.spotify_entity = value.spotify_entity;
         this._cfg.music_sources = (this._cfg.music_sources || []).slice();

@@ -9,6 +9,7 @@ const { listMaPlayers, findActivePlayer, applyZoneGroup, configuredPlayers } = a
 const DOMAIN = 'kiosk_musicassistant_cards';
 const PLAYBACK_TIMEOUT_S = 60;
 const ACCEPTED_GRACE_MS = 3000;
+const SOURCE_LEARN_TTL_MS = 10 * 60 * 1000;
 
 const STYLE = `
 :host {
@@ -531,6 +532,9 @@ export class MusicAssistantTouchCard extends HTMLElement {
     this._keyboardVisible = true;
     this._zoneIndex = 0;
     this._sourceIndex = 0;
+    this._autoSelectOnOpen = true;
+    this._sourceMappings = { entities: {}, providers: {} };
+    this._recentPlaybackSources = {};
     this._sourceGeneration = 0;
     this._searchSeq = 0;
     this._isSearching = false;
@@ -544,6 +548,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
   }
 
   connectedCallback() {
+    this._autoSelectOnOpen = true;
     if (this._hass && this._cfg) this._loadMissingData();
   }
 
@@ -590,6 +595,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
     this._sourceGeneration++;
     this._searchSeq++;
     this._restoreSource();
+    this._restoreSourceMappings();
     // keyboard: true uses the on-screen keyboard (Nest Hub, kiosk).
     // keyboard: false uses the device's regular text input.
     const thema = KIOSK_THEMES.includes(config.theme) ? config.theme : 'sunset';
@@ -767,6 +773,86 @@ export class MusicAssistantTouchCard extends HTMLElement {
     }));
   }
 
+  _sourceMappingStorageKey() { return `${DOMAIN}:source-mapping:${this._cfg.config_entry_id}`; }
+
+  _restoreSourceMappings() {
+    this._sourceMappings = { entities: {}, providers: {} };
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(this._sourceMappingStorageKey()) || '{}');
+      if (saved && typeof saved === 'object') {
+        this._sourceMappings.entities = saved.entities && typeof saved.entities === 'object' ? saved.entities : {};
+        this._sourceMappings.providers = saved.providers && typeof saved.providers === 'object' ? saved.providers : {};
+      }
+    } catch (error) { /* Kiosk browsers can disable local storage or contain stale data. */ }
+  }
+
+  _saveSourceMappings() {
+    try { window.localStorage.setItem(this._sourceMappingStorageKey(), JSON.stringify(this._sourceMappings)); }
+    catch (error) { /* Kiosk browsers can disable local storage. */ }
+  }
+
+  _rememberPlaybackSource(entity, username) {
+    if (!entity || !username) return;
+    this._sourceMappings.entities[entity] = username;
+    this._recentPlaybackSources[entity] = { username, startedAt: Date.now() };
+    this._saveSourceMappings();
+  }
+
+  _providerInstance(mediaContentId) {
+    if (typeof mediaContentId !== 'string') return '';
+    const separator = mediaContentId.indexOf('://');
+    if (separator <= 0) return '';
+    const instance = mediaContentId.slice(0, separator);
+    return instance.includes('--') ? instance : '';
+  }
+
+  _learnProviderMappings() {
+    if (!this._hass || !this._cfg) return;
+    let changed = false;
+    for (const zone of this._getZones()) {
+      const state = this._getState(zone.entity);
+      if (!state || state.state !== 'playing') continue;
+      const instance = this._providerInstance(state.attributes && state.attributes.media_content_id);
+      const recent = this._recentPlaybackSources[zone.entity];
+      if (!instance || !recent || Date.now() - recent.startedAt > SOURCE_LEARN_TTL_MS) continue;
+      if (this._sourceMappings.providers[instance] !== recent.username) {
+        this._sourceMappings.providers[instance] = recent.username;
+        changed = true;
+      }
+    }
+    if (changed) this._saveSourceMappings();
+  }
+
+  _sourceIndexForPlayback(zone) {
+    const state = this._getState(zone.entity);
+    const instance = this._providerInstance(state && state.attributes && state.attributes.media_content_id);
+    const candidates = [];
+    if (instance) {
+      const configured = this._sources.find((source) => (source.provider || '').trim() === instance);
+      if (configured) candidates.push(configured.username);
+      if (this._sourceMappings.providers[instance]) candidates.push(this._sourceMappings.providers[instance]);
+    }
+    if (this._sourceMappings.entities[zone.entity]) candidates.push(this._sourceMappings.entities[zone.entity]);
+    for (const username of candidates) {
+      const index = this._sources.findIndex((source) => source.username === username);
+      if (index >= 0) return index;
+    }
+    return -1;
+  }
+
+  _selectPlayingZoneOnOpen() {
+    const zones = this._getZones();
+    const playing = zones.map((zone, index) => ({ zone, index, state: this._getState(zone.entity) }))
+      .filter(({ state }) => state && state.state === 'playing');
+    if (playing.length !== 1) return;
+    const { zone, index } = playing[0];
+    this._zoneIndex = index;
+    this._activeEntityCache = null;
+    const sourceIndex = this._sourceIndexForPlayback(zone);
+    if (sourceIndex >= 0 && sourceIndex !== this._sourceIndex) this._switchSource(sourceIndex);
+    this._syncPlayer();
+  }
+
   _getSourceConfig() { return this._sources[this._sourceIndex] || null; }
   _getCurrentUser() { const source = this._getSourceConfig(); return source ? source.username : undefined; }
   _withUser(data, username = this._getCurrentUser()) {
@@ -933,6 +1019,11 @@ export class MusicAssistantTouchCard extends HTMLElement {
     }
     const rebuilt = isFirstUpdate || !this.shadowRoot.firstChild;
     if (rebuilt) this._buildCard();
+    this._learnProviderMappings();
+    if (this._autoSelectOnOpen && this._cfg) {
+      this._autoSelectOnOpen = false;
+      this._selectPlayingZoneOnOpen();
+    }
     // Theme and edit mode are re-checked every second; this setter runs on every state change in the house.
     if (rebuilt) { this._applyTheme(); this._syncKioskEditMode(); }
     if (this._watchedStatesChanged() || rebuilt || this._optimisticState) {
@@ -1225,6 +1316,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
       // If Music Assistant rejects the transfer because the queue is empty,
       // restart the remembered track on the new player.
       if (!transferSucceeded && sourceInfo && sourceInfo.media) {
+        this._rememberPlaybackSource(newZone.entity, username);
         await this._call('music_assistant', 'play_media',
           this._withUser({ media_id: sourceInfo.media, enqueue: 'replace' }, username),
           { entity_id: newZone.entity })
@@ -1431,8 +1523,9 @@ export class MusicAssistantTouchCard extends HTMLElement {
       if (playbackStatus) this._setPlaybackPhase(playbackStatus, 2);
       // A single track takes the place of the one playing and keeps the rest
       // of the queue; an album, playlist, artist or radio replaces the queue.
+      const entity = this._getPlayerEntity();
+      this._rememberPlaybackSource(entity, username);
       if (mediaTypeFromUri(uri) === 'track' && !radio) {
-        const entity = this._getPlayerEntity();
         if (playbackStatus && this._playbackProgress === playbackStatus) {
           const current = this._getState(entity);
           const currentAttributes = (current && current.attributes) || {};
@@ -1455,7 +1548,7 @@ export class MusicAssistantTouchCard extends HTMLElement {
       } else {
         await this._call('music_assistant', 'play_media',
           this._withUser({ media_id: uri, enqueue: 'replace', radio_mode: !!radio }, username),
-          { entity_id: this._getPlayerEntity() });
+          { entity_id: entity });
       }
     } catch (e) {
       if (playbackStatus && this._playbackProgress === playbackStatus) this._stopPlaybackProgress(playbackStatus);
