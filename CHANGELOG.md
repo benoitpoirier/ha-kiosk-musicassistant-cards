@@ -2,6 +2,10 @@
 
 All notable changes to Kiosk Music Assistant Cards, newest first, grouped by minor version.
 
+## 1.12.1 (1.12.1)
+
+- **Fixed:** Now-playing card: the status chip's accessible label (`aria-label`) now follows the displayed player when the card switches player without a state change.
+
 ## 1.12 (1.12.0)
 
 - **Configure speakers by Music Assistant name.** Both cards accept `ma_player` and resolve it to the current Home Assistant entity when Music Assistant recreates a player. Names match case- and accent-insensitively against the MA name (the HA device name, not its editable `friendly_name`); if several available players share a name, the first is used. Legacy `entity` ids remain supported, including stale ids resolved by name. `group_with` and `before.turn_off` also accept names; missing legacy volume targets are ignored.
