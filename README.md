@@ -51,8 +51,10 @@ Both cards are responsive and tuned for a 1280×800 kiosk (Echo Show 8 class): t
 
 See the [CHANGELOG](CHANGELOG.md) for the full history.
 
+- **Stable speaker setup** (1.12): configure both cards with `ma_player` names; they resolve the current Home Assistant entity after Music Assistant recreates a player, and list order sets priority.
+- **Music Assistant players sensor** (1.12): exposes playable players and their current entity ids for the cards.
 - **Music playing sensor** (1.11): follows Music Assistant players and groups directly, so kiosk automations keep working when a player gets a new Home Assistant entity id.
-- **Pick a speaker, not an entity** (1.8 – 1.9): the editors only list Music Assistant players, one per device. Music Assistant chooses the protocol (HEOS, AirPlay, DLNA…) itself, so the many Home Assistant entities of one device no longer matter. Wrong or stale entities are flagged with a one-click replacement, matched by name or by device model.
+- **Pick a speaker, not an entity** (1.8 – 1.9): the editors only list Music Assistant players, one per device. Music Assistant chooses the protocol (HEOS, AirPlay, DLNA…) itself, so the many Home Assistant entities of one device no longer matter.
 - **Speaker groups from Music Assistant** (1.9): `group_with` and `solo` replace the old join/unjoin options; a player synced to a group is followed through its leader.
 - **Each person gets their own Discover feed** (1.10): Music Assistant's play-log rows are global, so for a music source they are replaced by rows from that user's library; Top Picks follow the user too.
 - **Instant source switching** (1.10): similar-track feeds survive restarts and the other sources are warmed in the background; the rows keep their place while recommendations load.
@@ -122,18 +124,14 @@ tile_action: open
 zones:
   - name: Living room
     icon: mdi:sofa
-    entity: media_player.living_room
-    volume: media_player.living_room_amplifier
+    ma_player: Echo Show 8
     before:
-      turn_off: media_player.whole_house_group
-  - name: Downstairs
+      turn_off: Denon AVR-X3500H
+  - name: Denon AVR-X3500H
     icon: mdi:speaker-multiple
-    entity: media_player.kitchen
-    before:
-      join:
-        leader: media_player.kitchen
-        members:
-          - media_player.dining_room
+    ma_player: Denon AVR-X3500H
+    group_with:
+      - Echo Show 8
 music_sources:
   - name: Alice
     icon: mdi:spotify
@@ -206,16 +204,17 @@ links:
 | Option | Description |
 | --- | --- |
 | `name`, `icon` | Label and icon of the button. |
-| `entity` | Music Assistant `media_player` to play on. |
-| `volume` *(legacy YAML)* | Optional `media_player` that receives volume-slider changes (e.g. an amplifier). Still honoured; prefer the Music Assistant per-player volume control setting. |
+| `ma_player` | Preferred. Music Assistant player name (the HA device name created by MA); saved by the visual editor. |
+| `entity` *(legacy YAML)* | Home Assistant entity id of a Music Assistant player. Still honoured; a stale id is resolved by the MA name in its HA device name or entity id. |
+| `volume` *(legacy YAML)* | Optional Home Assistant `media_player` entity that receives volume changes (e.g. an amplifier). A missing target is ignored; the editor removes it when it points to the zone's own player. |
 | `volume_max`, `volume_start`, `volume_step` | Per-zone overrides of the general options. |
-| `group_with` | List of Music Assistant players to join to this zone's player before playing, using Music Assistant groups. |
+| `group_with` | Music Assistant players to join to this zone's player before playing, using Music Assistant groups. MA names are accepted and saved by the editor. |
 | `solo` | Detach this zone's player from any group before playing. |
-| `before.turn_off` | Player to switch off before playing on this zone. |
+| `before.turn_off` | Music Assistant player to switch off before playing on this zone. MA names are accepted and saved by the editor. |
 | `before.unjoin` *(legacy YAML)* | Still honoured. The visual editor converts it to `solo` when its player is the zone player. |
 | `before.join.leader` / `before.join.members` *(legacy YAML)* | Still honoured. The visual editor converts it to `group_with` when the leader is the zone player. |
 
-Use Music Assistant players for playback, with one MA player per physical device. MA merges a device's protocols and chooses the output protocol itself (for example HEOS, AirPlay or DLNA). The visual editors list MA players and flag configured non-MA entities with a suggested replacement when one can be matched. Suggestions also cover stale Music Assistant entities left behind when Music Assistant recreates a player under a new ID (for example, after switching to a universal player), matching by name or by the device model in the Home Assistant registries. The now-playing editor offers the same one-click replacement. A player synced to a group is followed through its group leader.
+Use MA player names (`ma_player`) whenever possible. The MA name is the Home Assistant device name created by Music Assistant, not the editable HA `friendly_name`; both the HA `entity_id` and MA `player_id` can change when MA recreates a player. Names are matched case- and accent-insensitively and resolved to the current HA entity id on every state update. A live legacy `entity` id is used as-is; a stale one is matched by the MA name found in its HA device name or entity id. If several available MA players share a name, the first is used and the editors show an info message. The order of `zones` is priority: when the browser opens, it selects the first playing zone. The order of now-playing `players` is priority too: the card shows the first playing player, and a manual choice remains selected until the set of playing players changes. `group_with` and `before.turn_off` also accept MA names. A player synced to a group is followed through its group leader.
 
 ### `music_sources` (Music Assistant users)
 
@@ -229,7 +228,7 @@ Lets several people switch between their own accounts (for example one Spotify a
 | `connect_entity` | Optional Spotify `media_player` of this account. No longer used: switching source keeps the current playback running. |
 | `spotify_entity` | Optional [SpotifyPlus](https://github.com/thlucas1/homeassistantcomponent_spotifyplus) `media_player` of this account. Its Spotify listening history (top tracks of the last weeks, recently played) seeds the *Discover* recommendations. |
 
-The selected source is remembered per dashboard in the browser local storage and shared with the now-playing card on that dashboard. Each time the card opens, it selects the zone if exactly one of its zones is playing; it selects the matching source using the configured `provider`, then a learned provider-to-user mapping, then the last source used by the card on that player. If the source cannot be identified, the saved/current source is kept. This selection never transfers or changes playback. Learned player/source mappings are stored locally per Music Assistant config entry.
+The selected source is remembered per dashboard in the browser local storage and shared with the now-playing card on that dashboard. Each time the card opens, it selects the first playing zone (in `zones` order); it selects the matching source using the configured `provider`, then a learned provider-to-user mapping, then the last source used by the card on that player. If the source cannot be identified, the saved/current source is kept. This selection never transfers or changes playback. Learned player/source mappings are stored locally per Music Assistant config entry and keyed by MA player name.
 
 ### `categories`
 
@@ -276,10 +275,10 @@ fill: true
 language: en
 volume_step: 5
 players:
-  - name: Living room
-    entity: media_player.living_room
-  - name: Kitchen
-    entity: media_player.kitchen
+  - name: Echo Show 8
+    ma_player: Echo Show 8
+  - name: Denon AVR-X3500H
+    ma_player: Denon AVR-X3500H
 favorite_accounts:
   spotify--abc123: media_player.spotifyplus_alice
 ```
@@ -290,7 +289,7 @@ favorite_accounts:
 | `height` | `560` | Card height in pixels (420 to 780). `0` (or `auto`) = Auto: fill the remaining screen height below the card, e.g. a full-screen panel view on a kiosk. The legacy `fill: true` still works. |
 | `fill_margin` | `8` | Bottom margin in pixels in Auto height. |
 | `language` | HA language | `en`, `fr` or `nl`. |
-| `players` | all Music Assistant players | Players to follow (same items as the browser card `zones`, which is also accepted). Only Music Assistant players are offered by the visual editor. The card shows the one that is playing (or the most recently paused). When several play at once, buttons let you choose. |
+| `players` | all Music Assistant players | Players to follow (same items as the browser card `zones`, which is also accepted). The visual editor saves the MA name as `ma_player`. The order is priority: the card shows the first player that is playing. A player picked by hand stays selected until the set of playing players changes. |
 | `volume_step` | `1` | Volume button step (%). The -/+ buttons repeat while held. |
 | `theme` | `sunset` | Accent colours, same names as the browser card `theme`. |
 | `autofill_similar` | `true` | When the track that plays is the last one of the queue, queue 10 similar tracks. |
@@ -364,6 +363,10 @@ automation:
         data:
           option: Screensaver
 ```
+
+### Music Assistant players sensor
+
+The integration also creates a *Music Assistant players* sensor (translation key `ma_players`) on the *Kiosk Music Assistant Cards* device. Its state is the number of playable Music Assistant players; `players` contains `{name, player_id, entity_id, type, available}` entries. This sensor is not recorded in history. The cards find it by `kiosk_card_role: ma_players` to resolve player names; if the sensor is absent, they fall back to Home Assistant device-registry names. Restart Home Assistant after updating the integration to add the new sensor platform.
 
 ## Example: wall kiosk with Kiosk Satellite
 
@@ -473,7 +476,7 @@ Replace `echo_show_8` with the name of your Kiosk Satellite device, and the sens
 
 Kiosk Satellite keeps control of when the screensaver starts (its inactivity timeout): the automations only choose what it shows and never force it on.
 
-The cards on this dashboard need no speaker entity ids either: the browser card `zones` and the now-playing card `players` list Music Assistant players, picked in the visual editors, and the now-playing card follows the music source chosen in the browser card (`follow_source`).
+The cards on this dashboard use Music Assistant player names (`ma_player`), not speaker entity ids: the browser card `zones` and now-playing card `players` are picked in the visual editors, and the now-playing card follows the music source chosen in the browser card (`follow_source`).
 
 ## Actions
 

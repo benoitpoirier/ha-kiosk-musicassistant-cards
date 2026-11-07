@@ -1,7 +1,7 @@
 const Q = new URL(import.meta.url).search;
 const { safeImageUrl, VOLUME_CSS, esc, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay, autofillSimilar, getSharedSource } = await import(`./shared.js${Q}`);
 const { THEME_COLORS } = await import(`./kiosk-theme.js${Q}`);
-const { listMaPlayers, isMaPlayer, maPlayerOptions, configuredPlayers, dropFollowers, loadDeviceInfo, suggestMaPlayer } = await import(`./players.js${Q}`);
+const { listMaPlayers, isMaPlayer, maPlayerOptions, configuredPlayers, dropFollowers, playerRef, resolvePlayer, resolveZone, isAmbiguousName } = await import(`./players.js${Q}`);
 
 const DOMAIN = 'kiosk_musicassistant_cards';
 const QUEUE_PAGE = 25;
@@ -203,24 +203,18 @@ const findHideSwitch = (states) => Object.values(states || {})
 
 // "Show buttons" mirrors the live hide switch (not the saved config) and drives it.
 export class KioskNowPlayingEditor extends HTMLElement {
-  constructor() {
-    super();
-    this._deviceInfo = {};
-  }
-
   setConfig(config) { this._config = config || {}; this._render(); }
 
   set hass(hass) {
-    const isFirstUpdate = !this._hass;
     this._hass = hass;
-    if (isFirstUpdate) loadDeviceInfo(hass).then((info) => {
-      if (Object.keys(info).length) {
-        this._deviceInfo = info;
-        this._key = null;
-        this._render();
-      }
-    });
     this._render();
+  }
+
+  // Music Assistant name of each configured player; a legacy entity id that
+  // matches no Music Assistant player is kept as it is, and flagged.
+  _playerValues() {
+    return configuredPlayers(this._config).filter(Boolean)
+      .map((player) => playerRef(this._hass, player) || player.entity).filter(Boolean);
   }
 
   _render() {
@@ -231,60 +225,32 @@ export class KioskNowPlayingEditor extends HTMLElement {
       this.appendChild(this._form);
     }
     const labels = getLanguage(this._hass.language).npEd;
-    const configuredIds = configuredPlayers(this._config)
-      .map((player) => player && player.entity).filter(Boolean);
-    const playerOptions = maPlayerOptions(this._hass, configuredIds, labels.groep);
-    const invalidIds = configuredIds.filter((id) => !isMaPlayer(this._hass.states[id]));
-    const suggestions = invalidIds.map((id) => {
-      const entity = suggestMaPlayer(this._hass, id, this._deviceInfo);
-      if (!entity) return null;
-      const state = this._hass.states[entity];
-      const name = (state && state.attributes && state.attributes.friendly_name) || entity;
-      return { id, entity, name };
-    }).filter(Boolean);
-    const noticeKey = JSON.stringify({ invalidIds, suggestions });
-    if (this._noticeKey === noticeKey) {
-      // Unchanged: keep the buttons, a state update must not swap them under a finger.
-    } else if (invalidIds.length) {
-      this._noticeKey = noticeKey;
-      if (!this._playersNotice) this._playersNotice = document.createElement('div');
-      const alert = document.createElement('ha-alert');
-      alert.setAttribute('alert-type', 'warning');
-      alert.textContent = `${labels.nietMa} ${invalidIds.map((id) => {
-        const state = this._hass.states[id];
-        return (state && state.attributes && state.attributes.friendly_name) || id;
-      }).join(', ')}`;
-      const children = [alert];
-      for (const suggestion of suggestions) {
-        const button = document.createElement('button');
-        button.textContent = labels.gebruikMa.replace('{name}', suggestion.name);
-        button.style.cssText = 'border:0;border-radius:999px;padding:6px 12px;margin:6px 6px 0 0;background:var(--primary-color);color:var(--text-primary-color,#fff);cursor:pointer;font:inherit';
-        button.addEventListener('click', () => {
-          const existing = configuredPlayers(this._config);
-          const players = existing.some((player) => player && player.entity === suggestion.entity)
-            ? existing.filter((player) => !player || player.entity !== suggestion.id)
-            : existing.map((player) => player && player.entity === suggestion.id
-              ? Object.assign({}, player, { entity: suggestion.entity }) : player);
-          this._config = Object.assign({}, this._config, { players });
-          delete this._config.zones;
-          this.dispatchEvent(new CustomEvent('config-changed', {
-            detail: { config: this._config }, bubbles: true, composed: true,
-          }));
-          this._key = null;
-          this._render();
-        });
-        children.push(button);
-      }
-      this._playersNotice.replaceChildren(...children);
-      if (this._playersNotice.nextSibling !== this._form) this.insertBefore(this._playersNotice, this._form);
-    } else {
+    const values = this._playerValues();
+    const playerOptions = maPlayerOptions(this._hass, values, labels.groep);
+    const missing = values.filter((value) => !isMaPlayer(this._hass.states[resolvePlayer(this._hass, value)]));
+    const doubles = values.filter((value) => !missing.includes(value) && isAmbiguousName(this._hass, value));
+    const noticeKey = JSON.stringify({ missing, doubles });
+    if (this._noticeKey !== noticeKey) {
       this._noticeKey = noticeKey;
       if (this._playersNotice) this._playersNotice.remove();
       this._playersNotice = null;
+      const alerts = [];
+      if (missing.length) alerts.push(['warning', `${labels.nietMa} ${missing.join(', ')}`]);
+      for (const name of doubles) alerts.push(['info', labels.dubbelMa.replace('{name}', name)]);
+      if (alerts.length) {
+        this._playersNotice = document.createElement('div');
+        this._playersNotice.replaceChildren(...alerts.map(([type, text]) => {
+          const alert = document.createElement('ha-alert');
+          alert.setAttribute('alert-type', type);
+          alert.textContent = text;
+          return alert;
+        }));
+        this.insertBefore(this._playersNotice, this._form);
+      }
     }
     const hide = findHideSwitch(this._hass.states);
-    const data = Object.assign({}, this._config, hide ? { show_buttons: hide.state !== 'on' } : {}, { players: configuredIds });
-    const key = JSON.stringify({ data, playerOptions, suggestions });
+    const data = Object.assign({}, this._config, hide ? { show_buttons: hide.state !== 'on' } : {}, { players: values });
+    const key = JSON.stringify({ data, playerOptions });
     if (this._key === key && this._form.hass === this._hass) return;
     this._key = key;
     const form = KioskNowPlayingCard.getConfigForm();
@@ -309,10 +275,16 @@ export class KioskNowPlayingEditor extends HTMLElement {
       }
       delete value.show_buttons;
     }
-    const existing = configuredPlayers(this._config);
-    const ids = [].concat(value.players || []).filter(Boolean);
-    if (ids.length) value.players = ids.map((id) => existing.find((player) => player && player.entity === id) || { entity: id });
-    else delete value.players;
+    const existing = configuredPlayers(this._config).filter(Boolean);
+    const names = [].concat(value.players || []).filter(Boolean);
+    if (names.length) {
+      value.players = names.map((name) => {
+        const player = Object.assign({}, existing.find((item) => (playerRef(this._hass, item) || item.entity) === name));
+        if (name.startsWith('media_player.')) return Object.assign(player, { entity: name });
+        delete player.entity;
+        return Object.assign(player, { ma_player: name });
+      });
+    } else delete value.players;
     delete value.zones;
     this._config = value;
     this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: value }, bubbles: true, composed: true }));
@@ -384,18 +356,22 @@ export class KioskNowPlayingCard extends HTMLElement {
     const shell = this.shadowRoot && this.shadowRoot.querySelector('.shell');
     if (shell) shell._sizes = {};
     this._configuredPlayers = configuredPlayers(this._cfg)
-      .filter((player) => player && typeof player.entity === 'string' && player.entity.startsWith('media_player.'));
-    this._autoPlayers = null;
-    this._selected = this._configuredPlayers[0] ? this._configuredPlayers[0].entity : null;
+      .filter((player) => player && (player.ma_player || String(player.entity || '').startsWith('media_player.')));
+    this._playersMemo = null;
+    this._selected = null;
+    this._manualKey = null;
   }
 
-  // Configured players, or else every Music Assistant player (looked up once).
+  // Configured players (in priority order) or every Music Assistant player,
+  // resolved to their current entity ids on each state update.
   get _players() {
-    if (this._configuredPlayers.length) return this._configuredPlayers;
-    if (this._autoPlayers) return this._autoPlayers;
-    const found = listMaPlayers(this._hass).map((player) => ({ name: player.name, entity: player.entity }));
-    if (found.length) this._autoPlayers = found;
-    return found;
+    const memo = this._playersMemo;
+    if (memo && memo.hass === this._hass) return memo.players;
+    const players = this._configuredPlayers.length
+      ? this._configuredPlayers.map((player) => resolveZone(this._hass, player)).filter((player) => player.entity)
+      : listMaPlayers(this._hass).map((player) => ({ name: player.name, entity: player.entity }));
+    this._playersMemo = { hass: this._hass, players };
+    return players;
   }
 
   _getEffectiveUsername() {
@@ -559,16 +535,22 @@ export class KioskNowPlayingCard extends HTMLElement {
     return false;
   }
 
+  // Several players playing: the first in the configured order, unless one was
+  // picked by hand since the set of playing players last changed.
   _activeEntity() {
     const playing = dropFollowers(this._hass, this._players.filter((player) => {
       const state = this._state(player.entity);
       return state && ['playing', 'buffering'].includes(state.state);
     }));
     if (playing.length) {
-      const selected = playing.find((player) => player.entity === this._selected);
-      this._selected = (selected || playing[0]).entity;
+      const key = playing.map((player) => player.entity).join(',');
+      this._playingKey = key;
+      const picked = key === this._manualKey && playing.find((player) => player.entity === this._selected);
+      if (!picked) this._manualKey = null;
+      this._selected = (picked || playing[0]).entity;
       return this._selected;
     }
+    this._manualKey = null;
     const paused = dropFollowers(this._hass, this._players.filter((player) => {
       const state = this._state(player.entity);
       return state && state.state === 'paused';
@@ -582,7 +564,8 @@ export class KioskNowPlayingCard extends HTMLElement {
       this._selected = (selected || paused[0]).entity;
       return this._selected;
     }
-    return this._selected || (this._players[0] && this._players[0].entity) || null;
+    const current = this._players.find((player) => player.entity === this._selected) || this._players[0];
+    return current ? current.entity : null;
   }
 
   _favoriteAccount(provider) {
@@ -1171,6 +1154,7 @@ export class KioskNowPlayingCard extends HTMLElement {
     const attributes = (state && state.attributes) || {};
     if (target.dataset.act === 'player') {
       this._selected = target.dataset.entity;
+      this._manualKey = this._playingKey;
       this._signature = '';
       this._sync();
     } else if (target.dataset.act === 'play-pause') {

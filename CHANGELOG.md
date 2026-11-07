@@ -2,6 +2,13 @@
 
 All notable changes to Kiosk Music Assistant Cards, newest first, grouped by minor version.
 
+## 1.12 (1.12.0)
+
+- **Configure speakers by Music Assistant name.** Both cards accept `ma_player` and resolve it to the current Home Assistant entity when Music Assistant recreates a player. Names match case- and accent-insensitively against the MA name (the HA device name, not its editable `friendly_name`); if several available players share a name, the first is used. Legacy `entity` ids remain supported, including stale ids resolved by name. `group_with` and `before.turn_off` also accept names; missing legacy volume targets are ignored.
+- **Player order sets priority.** The browser opens on the first playing zone. Now Playing shows the first playing player; a manual choice stays selected until the set of playing players changes. Learned browser source mappings are keyed by MA player name.
+- **New "Music Assistant players" sensor.** It reports the number of playable players and their current ids for card resolution. The sensor is not recorded in history and requires a Home Assistant restart after updating.
+- **Editors use player names.** They save `ma_player` names, show an info message when names are duplicated, and no longer offer "Use <player>" replacement suggestions.
+
 ## 1.11 (1.11.0 to 1.11.4)
 
 - **Discover fills itself after a Home Assistant restart.** An empty feed (Music Assistant still starting) is fetched again automatically instead of waiting for *Refresh*.

@@ -21,6 +21,11 @@
       "music_playing": {
         "name": "Musique en cours"
       }
+    },
+    "sensor": {
+      "ma_players": {
+        "name": "Lecteurs Music Assistant"
+      }
     }
   },
   "services": {

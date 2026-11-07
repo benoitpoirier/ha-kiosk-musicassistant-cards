@@ -21,6 +21,11 @@
       "music_playing": {
         "name": "Music playing"
       }
+    },
+    "sensor": {
+      "ma_players": {
+        "name": "Music Assistant players"
+      }
     }
   },
   "services": {

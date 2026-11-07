@@ -1,7 +1,7 @@
 const Q = new URL(import.meta.url).search;
 const { ICON_ALIASES, TAAL } = await import(`./shared.js${Q}`);
 const { KIOSK_THEMES } = await import(`./kiosk-theme.js${Q}`);
-const { maPlayerOptions, isMaPlayer, loadDeviceInfo, suggestMaPlayer } = await import(`./players.js${Q}`);
+const { maPlayerOptions, isMaPlayer, playerRef, resolvePlayer, isAmbiguousName } = await import(`./players.js${Q}`);
 
 const EDSTYLE = `
 :host { display:block; }
@@ -32,7 +32,6 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
-    this._deviceInfo = {};
   }
 
   setConfig(config) {
@@ -47,13 +46,6 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
   set hass(hass) {
     const isFirstUpdate = !this._hass;
     this._hass = hass;
-    if (isFirstUpdate) loadDeviceInfo(hass).then((info) => {
-      if (Object.keys(info).length) {
-        this._deviceInfo = info;
-        this._dirty = true;
-        this._renderEditor();
-      }
-    });
     if (isFirstUpdate || this._dirty) this._renderEditor();
     else this.shadowRoot.querySelectorAll('ha-form').forEach((f) => { f.hass = hass; });
   }
@@ -281,49 +273,60 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
     zoneSection.className = 'section';
     zoneSection.innerHTML = `<div class="heading">${editorText.zones}</div>`;
     const zones = config.zones || [];
+    // Players are shown and saved by Music Assistant name; legacy entity ids are converted on save.
+    const ref = (value) => (value ? playerRef(this._hass, value) || value : '');
     zones.forEach((z, i) => {
       const b = z.before || {};
-      const groupWithIds = Array.isArray(z.group_with) ? z.group_with
+      const zoneName = ref(z.ma_player ? z : z.entity);
+      const groupWithIds = (Array.isArray(z.group_with) ? z.group_with
         : (b.join && b.join.leader === z.entity && Array.isArray(b.join.members)
-          ? b.join.members.filter((id) => id !== z.entity) : []);
+          ? b.join.members.filter((id) => id !== z.entity) : [])).map(ref);
+      const turnOff = ref(b.turn_off);
       const zSchema = [
         { name: '', type: 'grid', schema: [
           { name: 'name', selector: { text: {} } },
           { name: 'icon', selector: { icon: {} } },
         ] },
-        { name: 'entity', selector: { select: { mode: 'dropdown', options: maPlayerOptions(this._hass, [z.entity], editorText.groep) } } },
+        { name: 'entity', selector: { select: { mode: 'dropdown', options: maPlayerOptions(this._hass, [zoneName], editorText.groep) } } },
         { name: '', type: 'grid', schema: [
           { name: 'volume_max', selector: { number: { min: 5, max: 100, step: 1, mode: 'box' } } },
           { name: 'volume_start', selector: { number: { min: 0, max: 100, step: 1, mode: 'box' } } },
           { name: 'volume_step', selector: { number: { min: 0.1, max: 100, step: 0.1, mode: 'box' } } },
         ] },
         { name: 'group_with', selector: { select: { multiple: true, mode: 'dropdown',
-          options: maPlayerOptions(this._hass, groupWithIds, editorText.groep).filter((option) => option.value !== z.entity) } } },
+          options: maPlayerOptions(this._hass, groupWithIds, editorText.groep).filter((option) => option.value !== zoneName) } } },
         { name: 'solo', selector: { boolean: {} } },
         { name: 'turn_off', selector: { select: { mode: 'dropdown', options: [
           { value: '', label: editorText.geen },
-          ...maPlayerOptions(this._hass, [b.turn_off], editorText.groep),
+          ...maPlayerOptions(this._hass, [turnOff], editorText.groep),
         ] } } },
       ];
       const zoneFormData = {
-        name: z.name || '', icon: this._iconHtml(z.icon), entity: z.entity || '',
+        name: z.name || '', icon: this._iconHtml(z.icon), entity: zoneName,
         volume_max: z.volume_max == null ? null : z.volume_max,
         volume_start: z.volume_start == null ? null : z.volume_start,
         volume_step: z.volume_step == null ? null : z.volume_step,
         group_with: groupWithIds,
         solo: !!z.solo || b.unjoin === z.entity,
-        turn_off: b.turn_off || '',
+        turn_off: turnOff,
       };
       const form = this._appendForm(zSchema, zoneFormData, (v) => {
         const currentZone = (this._cfg.zones || [])[i] || z;
-        const zoneConfig = Object.assign({}, currentZone, { name: v.name, entity: v.entity });
+        const zoneConfig = Object.assign({}, currentZone, { name: v.name });
+        delete zoneConfig.entity;
+        delete zoneConfig.ma_player;
+        if (String(v.entity || '').startsWith('media_player.')) zoneConfig.entity = v.entity;
+        else if (v.entity) zoneConfig.ma_player = v.entity;
+        if (zoneConfig.volume && resolvePlayer(this._hass, zoneConfig.volume) === resolvePlayer(this._hass, zoneConfig)) {
+          delete zoneConfig.volume;
+        }
         if (v.icon) zoneConfig.icon = v.icon;
         else delete zoneConfig.icon;
         for (const key of ['volume_max', 'volume_start', 'volume_step']) {
           if (v[key] != null && v[key] !== '') zoneConfig[key] = v[key];
           else delete zoneConfig[key];
         }
-        const groupWith = [].concat(v.group_with || []).filter((id) => id && id !== v.entity);
+        const groupWith = [].concat(v.group_with || []).filter((name) => name && name !== v.entity);
         if (groupWith.length) zoneConfig.group_with = groupWith;
         else delete zoneConfig.group_with;
         if (v.solo) zoneConfig.solo = true;
@@ -340,29 +343,21 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         this._emitConfigChange();
       });
       const content = document.createElement('div');
-      if (z.entity && !isMaPlayer(this._hass && this._hass.states[z.entity])) {
-        const alert = document.createElement('ha-alert');
-        alert.setAttribute('alert-type', 'warning');
-        alert.textContent = editorText.nietMa;
-        content.appendChild(alert);
-        const suggestion = suggestMaPlayer(this._hass, z.entity, this._deviceInfo);
-        if (suggestion) {
-          const suggestedState = this._hass.states[suggestion];
-          const suggestedName = (suggestedState && suggestedState.attributes && suggestedState.attributes.friendly_name) || suggestion;
-          content.appendChild(this._addButton(editorText.gebruikMa.replace('{name}', suggestedName), '', () => {
-            this._cfg.zones = (this._cfg.zones || []).slice();
-            this._cfg.zones[i] = Object.assign({}, z, { entity: suggestion });
-            this._rebuildEditor();
-          }));
-        }
+      const alert = (type, text) => {
+        const element = document.createElement('ha-alert');
+        element.setAttribute('alert-type', type);
+        element.textContent = text;
+        content.appendChild(element);
+      };
+      if (zoneName && !isMaPlayer(this._hass && this._hass.states[resolvePlayer(this._hass, zoneName)])) {
+        alert('warning', editorText.nietMa);
+      } else if (zoneName && isAmbiguousName(this._hass, zoneName)) {
+        alert('info', editorText.dubbelMa.replace('{name}', zoneName));
       }
-      if (z.volume) {
+      if (z.volume && resolvePlayer(this._hass, z.volume) !== resolvePlayer(this._hass, z.ma_player ? z : z.entity)) {
         const volumeState = this._hass && this._hass.states[z.volume];
         const volumeName = (volumeState && volumeState.attributes && volumeState.attributes.friendly_name) || z.volume;
-        const alert = document.createElement('ha-alert');
-        alert.setAttribute('alert-type', 'info');
-        alert.textContent = editorText.volumeLegacy.replace('{name}', volumeName);
-        content.appendChild(alert);
+        alert('info', editorText.volumeLegacy.replace('{name}', volumeName));
       }
       content.appendChild(form);
       zoneSection.appendChild(this._addPanel(z.name || editorText.naamloos, content, () => {

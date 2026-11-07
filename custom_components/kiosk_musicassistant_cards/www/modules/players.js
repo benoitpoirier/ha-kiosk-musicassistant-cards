@@ -18,86 +18,172 @@ export const isMaPlayer = (state) => !!state
 
 const playerName = (state) => (state.attributes && state.attributes.friendly_name) || state.entity_id;
 
-// Every playable Music Assistant player, sorted by name: `{ entity, name, type }`.
-export const listMaPlayers = (hass) => Object.values((hass && hass.states) || {})
-  .filter(isMaPlayer)
-  .map((state) => ({ entity: state.entity_id, name: playerName(state), type: state.attributes.mass_player_type }))
-  .sort((a, b) => a.name.localeCompare(b.name));
+const normalize = (s) => String(s || '').toLowerCase().normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 
-// Options for an ha-form `select` selector. A configured value that is not a
-// Music Assistant player stays in the list, flagged, so the form still shows it.
-// `groupLabel` is the translated word appended to group players.
+const isAvailable = (state) => !!state && state.state !== 'unavailable';
+
+// ---------- Music Assistant names ----------
+// Music Assistant re-creates players under new ids, in Home Assistant and in
+// Music Assistant alike; only the player name stays. The cards store that name
+// (`ma_player`) and look up the current entity here: from the integration's
+// players sensor, else from the device names Home Assistant got from Music
+// Assistant (never the friendly name, which users rename).
+
+let playersSensorId = null;
+const playersSensor = (states) => {
+  if (playersSensorId && states[playersSensorId]) return states[playersSensorId];
+  playersSensorId = Object.keys(states).find((id) => id.startsWith('sensor.')
+    && (states[id].attributes || {}).kiosk_card_role === 'ma_players') || null;
+  return playersSensorId ? states[playersSensorId] : null;
+};
+
+let directoryMemo = null;
+// `{ nameOf: Map(entity -> MA name), byName: Map(normalized name -> { name, entities }) }`
+const directory = (hass) => {
+  const states = (hass && hass.states) || {};
+  const sensor = playersSensor(states);
+  const entities = hass && hass.entities;
+  const devices = hass && hass.devices;
+  const memo = directoryMemo;
+  if (memo && memo.sensor === sensor && memo.entities === entities && memo.devices === devices
+    && (entities || memo.states === states)) return memo.value;
+  const nameOf = new Map();
+  if (entities && devices) {
+    for (const entry of Object.values(entities)) {
+      if (entry.platform !== 'music_assistant' || !entry.entity_id.startsWith('media_player.')) continue;
+      const device = devices[entry.device_id];
+      if (device && device.name) nameOf.set(entry.entity_id, device.name);
+    }
+  } else {
+    for (const state of Object.values(states)) if (isMaPlayer(state)) nameOf.set(state.entity_id, playerName(state));
+  }
+  for (const player of ((sensor && sensor.attributes.players) || [])) {
+    if (player && player.entity_id && player.name) nameOf.set(player.entity_id, player.name);
+  }
+  const byName = new Map();
+  for (const [entity, name] of nameOf) {
+    const key = normalize(name);
+    if (!byName.has(key)) byName.set(key, { name, entities: [] });
+    byName.get(key).entities.push(entity);
+  }
+  directoryMemo = { sensor, entities, devices, states, value: { nameOf, byName } };
+  return directoryMemo.value;
+};
+
+// The Music Assistant players named `name`: the available ones, else all of them.
+const playersNamed = (hass, name) => {
+  const entry = name && directory(hass).byName.get(normalize(name));
+  if (!entry) return [];
+  const states = (hass && hass.states) || {};
+  const players = entry.entities.filter((id) => isMaPlayer(states[id]));
+  const available = players.filter((id) => isAvailable(states[id]));
+  return available.length ? available : players;
+};
+
+// Music Assistant name of an entity id, including a stale one: its own name,
+// else the name of its device (the HEOS entity of a Denon...), else its id.
+export const maPlayerName = (hass, entityId) => {
+  if (!entityId) return null;
+  const { nameOf, byName } = directory(hass);
+  if (nameOf.has(entityId)) return nameOf.get(entityId);
+  const known = (name) => {
+    const entry = name && byName.get(normalize(name));
+    return entry ? entry.name : null;
+  };
+  const entry = hass && hass.entities && hass.entities[entityId];
+  const device = entry && hass.devices && hass.devices[entry.device_id];
+  const slug = String(entityId).replace(/^media_player\./, '');
+  return known(device && device.name) || known(slug) || known(slug.replace(/_\d+$/, ''));
+};
+
+// A configured player: `{ ma_player }`, a legacy `{ entity }`, or a plain
+// string (a Music Assistant name or an entity id).
+const refParts = (ref) => {
+  if (typeof ref === 'string') return ref.startsWith('media_player.') ? { entity: ref } : { name: ref };
+  return { name: ref && ref.ma_player, entity: ref && ref.entity };
+};
+
+// Music Assistant name of a configured player, or null.
+export const playerRef = (hass, ref) => {
+  const { name, entity } = refParts(ref);
+  return name || maPlayerName(hass, entity);
+};
+
+// Current entity id of a configured player. An available legacy entity id is
+// kept as it is; a stale one is replaced by the player with the same name.
+export const resolvePlayer = (hass, ref) => {
+  const { name, entity } = refParts(ref);
+  const states = (hass && hass.states) || {};
+  if (!name && entity && isAvailable(states[entity])) return entity;
+  const found = playersNamed(hass, name || maPlayerName(hass, entity));
+  if (found.length) return found.includes(entity) ? entity : found[0];
+  return entity || null;
+};
+
+// True when several available Music Assistant players share this name.
+export const isAmbiguousName = (hass, name) => {
+  const states = (hass && hass.states) || {};
+  return playersNamed(hass, name).filter((id) => isAvailable(states[id])).length > 1;
+};
+
+// A zone or player config with every player reference resolved to its current entity.
+export const resolveZone = (hass, zone) => {
+  if (!zone) return zone;
+  const resolve = (ref) => resolvePlayer(hass, ref);
+  const out = Object.assign({}, zone, { entity: resolve(zone.ma_player ? zone : zone.entity) || '' });
+  if (Array.isArray(zone.group_with)) out.group_with = zone.group_with.map(resolve).filter(Boolean);
+  if (zone.volume) {
+    const volume = hass && hass.states[zone.volume] ? zone.volume : resolve(zone.volume);
+    if (volume && hass && hass.states[volume]) out.volume = volume;
+    else delete out.volume;
+  }
+  if (zone.before) {
+    const before = Object.assign({}, zone.before);
+    if (before.turn_off) before.turn_off = resolve(before.turn_off);
+    if (before.unjoin) before.unjoin = resolve(before.unjoin);
+    if (before.join) {
+      before.join = Object.assign({}, before.join, {
+        leader: resolve(before.join.leader),
+        members: [].concat(before.join.members || []).map(resolve).filter(Boolean),
+      });
+    }
+    out.before = before;
+  }
+  return out;
+};
+
+// Every playable Music Assistant player, one per name, sorted by name:
+// `{ entity, name, type }` where `name` is the Music Assistant name.
+export const listMaPlayers = (hass) => {
+  const states = (hass && hass.states) || {};
+  const players = [];
+  for (const { name } of directory(hass).byName.values()) {
+    const entity = playersNamed(hass, name)[0];
+    if (entity) players.push({ entity, name, type: states[entity].attributes.mass_player_type });
+  }
+  return players.sort((a, b) => a.name.localeCompare(b.name));
+};
+
+// Options for an ha-form `select` selector; values are Music Assistant names.
+// A configured value that is not a Music Assistant player stays in the list,
+// flagged, so the form still shows it. `groupLabel` is the translated word
+// appended to group players.
 export const maPlayerOptions = (hass, current = [], groupLabel = 'group') => {
   const options = listMaPlayers(hass).map((p) => ({
-    value: p.entity, label: p.type === 'group' ? `${p.name} (${groupLabel})` : p.name,
+    value: p.name, label: p.type === 'group' ? `${p.name} (${groupLabel})` : p.name,
   }));
-  for (const id of [].concat(current || [])) {
-    if (!id || options.some((o) => o.value === id)) continue;
-    const state = hass && hass.states[id];
-    options.push({ value: id, label: `⚠ ${state ? playerName(state) : id}` });
+  for (const value of [].concat(current || [])) {
+    if (!value || options.some((o) => o.value === value)) continue;
+    const state = hass && hass.states[value];
+    options.push({ value, label: `⚠ ${state ? playerName(state) : value}` });
   }
   return options;
 };
 
-const normalize = (s) => String(s || '').toLowerCase().normalize('NFD')
-  .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
-
-// Device model and manufacturer of every media player, from the Home Assistant
-// registries (admin only, so for the editors). Music Assistant names a player
-// as it likes ("Denon ( MA)"), but its device keeps the model of the hardware.
-let deviceInfoPromise = null;
-export const loadDeviceInfo = (hass) => {
-  if (!deviceInfoPromise) {
-    deviceInfoPromise = Promise.all([
-      hass.callWS({ type: 'config/entity_registry/list' }),
-      hass.callWS({ type: 'config/device_registry/list' }),
-    ]).then(([entities, devices]) => {
-      const byId = new Map(devices.map((d) => [d.id, d]));
-      const info = {};
-      for (const e of entities) {
-        const d = e.entity_id.startsWith('media_player.') && byId.get(e.device_id);
-        if (d) info[e.entity_id] = { model: d.model || '', manufacturer: d.manufacturer || '' };
-      }
-      return info;
-    }).catch(() => { deviceInfoPromise = null; return {}; });
-  }
-  return deviceInfoPromise;
-};
-
-// For an entity that is not a playable Music Assistant player (the HEOS or
-// denonavr entity of a Denon, or a stale Music Assistant entity left behind
-// when Music Assistant renamed the player), suggest the Music Assistant player
-// of the same device: same name, else same device model (from loadDeviceInfo),
-// else a unique partial name match. Returns an entity id or null.
-export const suggestMaPlayer = (hass, entityId, deviceInfo = {}) => {
-  const state = hass && hass.states[entityId];
-  if (!entityId || isMaPlayer(state)) return null;
-  const players = listMaPlayers(hass).filter((p) => p.type !== 'group');
-  const wanted = normalize(state ? playerName(state) : entityId.replace(/^media_player\./, '').replace(/_\d+$/, ''));
-  const exact = wanted && players.find((p) => normalize(p.name) === wanted);
-  if (exact) return exact.entity;
-  const own = deviceInfo[entityId] || {};
-  const model = normalize(own.model);
-  if (model.length >= 4) {
-    const sameModel = players.filter((p) => {
-      const other = deviceInfo[p.entity] || {};
-      const otherModel = normalize(other.model);
-      if (otherModel.length < 4 || !(otherModel.includes(model) || model.includes(otherModel))) return false;
-      return !own.manufacturer || !other.manufacturer
-        || normalize(own.manufacturer) === normalize(other.manufacturer);
-    });
-    if (sameModel.length === 1) return sameModel[0].entity;
-  }
-  if (!wanted) return null;
-  const partial = players.filter((p) => {
-    const name = normalize(p.name);
-    return name && (name.includes(wanted) || wanted.includes(name));
-  });
-  return partial.length === 1 ? partial[0].entity : null;
-};
-
 // Players configured on a card. Both cards accept `zones` (browser) and
-// `players` (now-playing) with the same `{ entity, name, icon, ... }` items.
+// `players` (now-playing) with the same `{ ma_player, name, icon, ... }` items
+// (legacy items carry an `entity` id instead of `ma_player`).
 export const configuredPlayers = (cfg) => {
   const c = cfg || {};
   if (Array.isArray(c.zones) && c.zones.length) return c.zones;

@@ -4,7 +4,7 @@ const {
   normalizeSpotifyUri, autofillSimilar, PLAYING_STATES, safeImageUrl, VOLUME_CSS, defaultCategories, esc, formatDuration, svg, getLanguage, bindVolumeControl, volumeControlHtml, updateVolumeDisplay, getSharedSource, sharedSourceStorageKey,
 } = await import(`./shared.js${Q}`);
 const { KIOSK_CSS, KIOSK_THEMES } = await import(`./kiosk-theme.js${Q}`);
-const { listMaPlayers, findActivePlayer, applyZoneGroup, configuredPlayers } = await import(`./players.js${Q}`);
+const { listMaPlayers, findActivePlayer, applyZoneGroup, configuredPlayers, resolveZone, maPlayerName } = await import(`./players.js${Q}`);
 
 const DOMAIN = 'kiosk_musicassistant_cards';
 const PLAYBACK_TIMEOUT_S = 60;
@@ -791,9 +791,12 @@ export class MusicAssistantTouchCard extends HTMLElement {
     catch (error) { /* Kiosk browsers can disable local storage. */ }
   }
 
+  // Learned sources are keyed by Music Assistant name, which survives a re-created player.
+  _playerKey(entity) { return maPlayerName(this._hass, entity) || entity; }
+
   _rememberPlaybackSource(entity, username) {
     if (!entity || !username) return;
-    this._sourceMappings.entities[entity] = username;
+    this._sourceMappings.entities[this._playerKey(entity)] = username;
     this._recentPlaybackSources[entity] = { username, startedAt: Date.now() };
     this._saveSourceMappings();
   }
@@ -832,7 +835,8 @@ export class MusicAssistantTouchCard extends HTMLElement {
       if (configured) candidates.push(configured.username);
       if (this._sourceMappings.providers[instance]) candidates.push(this._sourceMappings.providers[instance]);
     }
-    if (this._sourceMappings.entities[zone.entity]) candidates.push(this._sourceMappings.entities[zone.entity]);
+    const learned = this._sourceMappings.entities[this._playerKey(zone.entity)] || this._sourceMappings.entities[zone.entity];
+    if (learned) candidates.push(learned);
     for (const username of candidates) {
       const index = this._sources.findIndex((source) => source.username === username);
       if (index >= 0) return index;
@@ -840,11 +844,12 @@ export class MusicAssistantTouchCard extends HTMLElement {
     return -1;
   }
 
+  // Several zones playing: the first in the configured order wins.
   _selectPlayingZoneOnOpen() {
     const zones = this._getZones();
     const playing = zones.map((zone, index) => ({ zone, index, state: this._getState(zone.entity) }))
       .filter(({ state }) => state && state.state === 'playing');
-    if (playing.length !== 1) return;
+    if (!playing.length) return;
     const { zone, index } = playing[0];
     this._zoneIndex = index;
     this._activeEntityCache = null;
@@ -859,16 +864,21 @@ export class MusicAssistantTouchCard extends HTMLElement {
     return username ? Object.assign({}, data, { username }) : data;
   }
 
-  // Use configured zones, or discover all Music Assistant players automatically.
+  // Configured zones, or every Music Assistant player, resolved to their
+  // current entity ids on each state update.
   _getZones() {
+    const memo = this._zones;
+    if (memo && memo.hass === this._hass) return memo.zones;
     const configured = configuredPlayers(this._cfg);
-    if (configured.length) return configured;
-    if (this._zones) return this._zones;
-    const players = listMaPlayers(this._hass).map((p) => ({
-      name: p.name, entity: p.entity, icon: p.type === 'group' ? 'groep' : 'speaker',
-    }));
-    this._zones = players.length ? players : [{ name: this._getLanguage().speler, entity: '', icon: 'speaker' }];
-    return this._zones;
+    let zones = configured.map((zone) => resolveZone(this._hass, zone));
+    if (!zones.length) {
+      zones = listMaPlayers(this._hass).map((p) => ({
+        name: p.name, entity: p.entity, icon: p.type === 'group' ? 'groep' : 'speaker',
+      }));
+    }
+    if (!zones.length) zones = [{ name: this._getLanguage().speler, entity: '', icon: 'speaker' }];
+    this._zones = { hass: this._hass, zones };
+    return zones;
   }
 
   getCardSize() { return 12; }
