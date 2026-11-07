@@ -255,7 +255,7 @@ export class KioskNowPlayingEditor extends HTMLElement {
     this._key = key;
     const form = KioskNowPlayingCard.getConfigForm();
     form.schema.splice(2, 0, { name: 'players', selector: { select: {
-      multiple: true, mode: 'dropdown', options: playerOptions,
+      multiple: true, mode: 'dropdown', reorder: true, options: playerOptions,
     } } });
     this._form.hass = this._hass;
     this._form.schema = form.schema;

@@ -215,6 +215,7 @@ links:
 | `before.join.leader` / `before.join.members` *(legacy YAML)* | Still honoured. The visual editor converts it to `group_with` when the leader is the zone player. |
 
 Use MA player names (`ma_player`) whenever possible. The MA name is the Home Assistant device name created by Music Assistant, not the editable HA `friendly_name`; both the HA `entity_id` and MA `player_id` can change when MA recreates a player. Names are matched case- and accent-insensitively and resolved to the current HA entity id on every state update. A live legacy `entity` id is used as-is; a stale one is matched by the MA name found in its HA device name or entity id. If several available MA players share a name, the first is used and the editors show an info message. The order of `zones` is priority: when the browser opens, it selects the first playing zone. The order of now-playing `players` is priority too: the card shows the first playing player, and a manual choice remains selected until the set of playing players changes. `group_with` and `before.turn_off` also accept MA names. A player synced to a group is followed through its group leader.
+The visual editors also let you reorder: drag the player chips in the now-playing editor, or use Move up / Move down on browser zones.
 
 ### `music_sources` (Music Assistant users)
 

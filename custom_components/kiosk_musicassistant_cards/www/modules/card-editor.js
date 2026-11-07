@@ -106,21 +106,35 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
     return b;
   }
 
-  _addPanel(title, content, onRemove) {
+  _addPanel(title, content, onRemove, onMove) {
     const panel = document.createElement('ha-expansion-panel');
     panel.outlined = true;
     panel.header = title;
     const contentBlock = document.createElement('div');
     contentBlock.className = 'block';
     contentBlock.appendChild(content);
-    if (onRemove) {
-      const removeRow = document.createElement('div');
-      removeRow.className = 'row';
-      removeRow.appendChild(this._addButton(this._getEditorText().weg, 'remove', onRemove));
-      contentBlock.appendChild(removeRow);
+    if (onRemove || onMove) {
+      const actionRow = document.createElement('div');
+      actionRow.className = 'row';
+      const editorText = this._getEditorText();
+      if (onMove && onMove.up) actionRow.appendChild(this._addButton(editorText.omhoog, '', onMove.up));
+      if (onMove && onMove.down) actionRow.appendChild(this._addButton(editorText.omlaag, '', onMove.down));
+      if (onRemove) actionRow.appendChild(this._addButton(editorText.weg, 'remove', onRemove));
+      contentBlock.appendChild(actionRow);
     }
     panel.appendChild(contentBlock);
     return panel;
+  }
+
+  _moveZone(i, delta) {
+    const zones = (this._cfg.zones || []).slice();
+    const target = i + delta;
+    if (i < 0 || i >= zones.length || target < 0 || target >= zones.length) return;
+    const zone = zones[i];
+    zones[i] = zones[target];
+    zones[target] = zone;
+    this._cfg.zones = zones;
+    this._rebuildEditor();
   }
 
   _renderEditor() {
@@ -364,6 +378,9 @@ export class MusicAssistantTouchCardEditor extends HTMLElement {
         this._cfg.zones = zones.filter((x, k) => k !== i);
         if (!this._cfg.zones.length) delete this._cfg.zones;
         this._rebuildEditor();
+      }, {
+        up: i > 0 ? () => this._moveZone(i, -1) : null,
+        down: i < zones.length - 1 ? () => this._moveZone(i, 1) : null,
       }));
     });
     zoneSection.appendChild(this._addButton(editorText.zoneToe, '', () => {
