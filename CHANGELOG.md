@@ -2,6 +2,10 @@
 
 All notable changes to Kiosk Music Assistant Cards, newest first, grouped by minor version.
 
+## 1.12.2 (1.12.2)
+
+- **Reorder players in the card editors.** Now Playing: drag the player chips; browser card: *Move up* / *Move down* on each player. The first player of the list has priority when several are playing.
+
 ## 1.12.1 (1.12.1)
 
 - **Fixed:** Now-playing card: the status chip's accessible label (`aria-label`) now follows the displayed player when the card switches player without a state change.
